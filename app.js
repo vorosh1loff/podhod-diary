@@ -216,7 +216,7 @@ function finishDialog({ route, addedItemId, message } = {}) {
     const added = addedItemId && main.querySelector(`[data-exercise-id="${addedItemId}"]`);
     if (added) {
       added.focus({ preventScroll: true });
-      added.scrollIntoView({ block: 'start', behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+      added.scrollIntoView({ block: 'center', behavior: reducedMotion.matches ? 'auto' : 'smooth' });
     }
   }
   if (message) showNotice(message);
@@ -314,9 +314,15 @@ function startWorkout(date) {
   });
 }
 
-function attachExercise(workout, exercise, itemId) {
-  if (workout.items.some(item => item.exerciseId === exercise.id)) throw new Error('Это упражнение уже есть в тренировке.');
-  workout.items.push({ ...exercise, exerciseId: exercise.id, id: itemId, sets: [] });
+function placeExercise({ items }, exercise, itemId, replacedId) {
+  if (items.some(item => item.exerciseId === exercise.id)) throw new Error('Это упражнение уже есть в тренировке.');
+  const entry = { ...exercise, exerciseId: exercise.id, id: itemId, sets: [] };
+  if (replacedId) {
+    const replaced = findEntry(items, replacedId, 'Упражнение');
+    items[items.indexOf(replaced)] = entry;
+  } else {
+    items.push(entry);
+  }
 }
 
 function moveExercise(next, workoutId, template, itemId, anchorId, after) {
@@ -393,24 +399,37 @@ function editExercise(exercise, workout, item, template = false) {
         }
         if (exercise) Object.assign(findEntry(next.exercises, exercise.id, 'Упражнение'), updated);
         else next.exercises.push(updated);
-        if (addedItemId) attachExercise(findEntry(trainingList(next, template), workout.id, 'Тренировка'), updated, addedItemId);
+        if (addedItemId) placeExercise(findEntry(trainingList(next, template), workout.id, 'Тренировка'), updated, addedItemId);
       });
       return { addedItemId, message: item ? 'Упражнение обновлено' : workout ? 'Упражнение добавлено' : 'Каталог обновлён' };
     },
   });
 }
 
-function pickExercise(workout) {
+function pickExercise(workout, trigger, replaced) {
   const attached = new Set(workout.items.map(item => item.exerciseId));
   const options = state.exercises.filter(item => !attached.has(item.id)).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  const intro = replaced
+    ? `<p class="form-context replacement-context">Заменяем «${esc(replaced.name)}». Новое упражнение займёт то же место. Подходы прежнего упражнения будут удалены из этой записи.</p>`
+    : `<div class="picker-new">${action('new-and-attach', 'Создать своё', 'plus', 'secondary')}</div>`;
   openDialog({
-    title: 'Добавить упражнение',
-    content: `<div class="picker-new">${action('new-and-attach', 'Создать своё', 'plus', 'secondary')}</div>
+    title: replaced ? 'Заменить упражнение' : 'Добавить упражнение',
+    content: `${intro}
       ${options.length ? `<label class="search-field">${icon('search', 20)}<input type="search" id="picker-search" aria-label="Найти упражнение" placeholder="Найти упражнение"></label>
       <ul class="picker-list">${options.map(item => `<li data-exercise-row data-search="${esc(item.name.toLocaleLowerCase('ru'))}">
-        ${action('attach', esc(item.name), 'plus', 'picker-item', `data-id="${item.id}"`)}</li>`).join('')}</ul>
+        ${replaced
+          ? `<label class="button picker-item"><input type="radio" name="replacement" value="${item.id}" required><span>${esc(item.name)}</span></label>`
+          : action('attach', esc(item.name), 'plus', 'picker-item', `data-id="${item.id}"`)}</li>`).join('')}</ul>
       <p id="catalog-empty" class="muted" hidden>Совпадений нет.</p>` : '<p class="muted">Доступных упражнений в каталоге пока нет.</p>'}`,
-    trigger: document.activeElement,
+    trigger,
+    label: 'Заменить',
+    danger: Boolean(replaced?.sets.length),
+    submit: replaced && options.length ? async data => {
+      const addedItemId = crypto.randomUUID();
+      await save(next => placeExercise(findEntry(next.workouts, workout.id, 'Тренировка'),
+        findEntry(next.exercises, data.get('replacement'), 'Упражнение'), addedItemId, replaced.id));
+      return { addedItemId, message: 'Упражнение заменено' };
+    } : undefined,
   });
 }
 
@@ -614,8 +633,11 @@ document.addEventListener('input', event => {
   if (input.id === 'catalog-search') {
     search = input.value;
     filterRows(main, search);
-  } else if (input.id === 'picker-search') filterRows(dialog, input.value);
-  else if (input.type === 'checkbox' && input.checked && ['primary', 'secondary'].includes(input.name)) {
+  } else if (input.id === 'picker-search') {
+    filterRows(dialog, input.value);
+    const selected = dialog.querySelector('input[name="replacement"]:checked');
+    if (selected?.closest('[hidden]')) selected.checked = false;
+  } else if (input.type === 'checkbox' && input.checked && ['primary', 'secondary'].includes(input.name)) {
     const other = input.name === 'primary' ? 'secondary' : 'primary';
     input.form.querySelector(`input[name="${other}"][value="${input.value}"]`).checked = false;
   }
@@ -748,7 +770,8 @@ document.addEventListener('click', async event => {
       if (exercise) confirmRemove('Удалить из каталога?', `«${esc(exercise.name)}» исчезнет из каталога. Подходы в тренировках сохранятся.`,
         next => removeEntry(next.exercises, id));
       break;
-    case 'choose-item': if (workout) pickExercise(workout); break;
+    case 'choose-item': if (workout) pickExercise(workout, button); break;
+    case 'replace-item': if (!template && item) pickExercise(workout, button, item); break;
     case 'move-item': if (item) chooseExercisePosition(workout, item, template, button); break;
     case 'new-and-attach': if (workout) editExercise(null, workout, null, template); break;
     case 'edit-item': if (item) editExercise(null, workout, item, template); break;
@@ -758,7 +781,7 @@ document.addEventListener('click', async event => {
       pending = true;
       dialog.querySelectorAll('button').forEach(control => { control.disabled = true; });
       try {
-        await save(next => attachExercise(findEntry(trainingList(next, template), workout.id, 'Тренировка'),
+        await save(next => placeExercise(findEntry(trainingList(next, template), workout.id, 'Тренировка'),
           findEntry(next.exercises, id, 'Упражнение'), addedItemId));
         finishDialog({ addedItemId, message: 'Упражнение добавлено' });
       } catch (error) {

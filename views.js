@@ -251,7 +251,10 @@ export function workoutView(workout, { date, history = false, template = false, 
               <td><div class="row-actions">${iconButton('edit-set', `Редактировать подход ${index + 1}`, 'edit', `data-id="${item.id}" data-set="${set.id}"`)}
               ${iconButton('delete-set', `Удалить подход ${index + 1}`, 'trash', `data-id="${item.id}" data-set="${set.id}"`)}</div></td></tr>`).join('')}
           </tbody></table>` : '<p class="empty-set">Запишите первый подход.</p>'}
-          ${action('new-set', 'Добавить подход', 'plus', 'text-button', `data-id="${item.id}"`)}
+          <div class="exercise-actions">
+            ${action('new-set', 'Добавить подход', 'plus', 'text-button', `data-id="${item.id}"`)}
+            ${template ? '' : action('replace-item', 'Заменить упражнение', 'swap', 'text-button', `data-id="${item.id}"`)}
+          </div>
         </article>`).join('')}
       </div>
       ${!workout.items.length ? '<p class="muted empty-workout">Выберите упражнение из каталога или создайте своё.</p>' : ''}

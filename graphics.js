@@ -2,6 +2,7 @@ const paths = {
   fire: '<path fill="currentColor" stroke="none" d="M13 2c.7 4.6 6.5 6.1 6.5 12.1a7.5 7.5 0 1 1-15 0c0-2.6 1.3-5 3.3-6.7-.1 2 .8 3.1 1.7 3.7C9 7.8 11.8 5.6 13 2Zm-.2 10.2c-1 1.8-3.2 3-3.2 5a2.6 2.6 0 0 0 5.2 0c0-1.9-1.4-2.8-2-5Z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   arrow: '<path d="M5 12h14m-6-6 6 6-6 6"/>',
+  swap: '<path d="M4 8h16m-4-4 4 4-4 4M20 16H4m4-4-4 4 4 4"/>',
   back: '<path d="M19 12H5m6 6-6-6 6-6"/>',
   previous: '<path d="m15 5-7 7 7 7"/>',
   next: '<path d="m9 5 7 7-7 7"/>',
