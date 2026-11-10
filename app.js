@@ -2,6 +2,7 @@ import { openStorage, readState, changeState } from './storage.js';
 import { today, isDate, validSet, parseBackup, backupOf, plural, formatDate, shortDate, NOTE_LIMIT, validNote,
   INBODY_FIELDS, INBODY_METRICS, parseMeasurement, parseMeasurements } from './model.js';
 import { icon } from './graphics.js';
+import { enableExerciseReorder } from './exercise-reorder.js';
 import { esc, navigation, journal, calendar, historyView, catalog, workoutView, workoutBackLink, dataView, muscleFields, action,
   measurementFields, inbodyChart, inbodyHistory, inbodyDetails } from './views.js';
 
@@ -22,6 +23,7 @@ let search = '';
 let selectedExercises = null;
 let displayedDay;
 let inbodyMetric = 'weight';
+const cancelExerciseReorder = enableExerciseReorder(main, dropExercise);
 
 function getRoute() {
   const [page, id, context, originDate] = location.hash.slice(1).split('/');
@@ -46,6 +48,7 @@ function removeEntry(items, id) {
 
 function render({ navigate = false } = {}) {
   if (!state) return;
+  cancelExerciseReorder();
   const { page, id, fromDate, fromHistory } = getRoute();
   displayedDay = today();
   if (page !== 'exercises') selectedExercises = null;
@@ -283,6 +286,53 @@ function startWorkout(date) {
 function attachExercise(workout, exercise) {
   if (workout.items.some(item => item.exerciseId === exercise.id)) throw new Error('Это упражнение уже есть в тренировке.');
   workout.items.push({ ...exercise, exerciseId: exercise.id, id: crypto.randomUUID(), sets: [] });
+}
+
+function moveExercise(next, workoutId, template, itemId, anchorId, after) {
+  const { items } = findEntry(trainingList(next, template), workoutId, 'Тренировка');
+  const item = findEntry(items, itemId, 'Упражнение');
+  const anchor = findEntry(items, anchorId, 'Упражнение');
+  if (item === anchor) return;
+  items.splice(items.indexOf(item), 1);
+  items.splice(items.indexOf(anchor) + (after ? 1 : 0), 0, item);
+}
+
+async function dropExercise(handle, anchorId, after) {
+  if (pending || dialog.open) return;
+  const hash = location.hash;
+  const { page, id } = getRoute();
+  pending = true;
+  try {
+    await save(next => moveExercise(next, id, page === 'template', handle.dataset.id, anchorId, after));
+    if (location.hash === hash) {
+      render();
+      restoreFocus(handle);
+    }
+    showNotice('Порядок упражнений сохранён');
+  } catch {
+    showNotice('Не удалось сохранить порядок упражнений.');
+  } finally {
+    pending = false;
+    void refresh();
+  }
+}
+
+function chooseExercisePosition(workout, item, template, trigger) {
+  const position = workout.items.indexOf(item);
+  openDialog({
+    title: 'Переместить упражнение', trigger,
+    content: `<p class="form-context">${esc(item.name)}</p>
+      <label class="field">Новая позиция<select name="position">
+        ${workout.items.map(({ id }, index) => `<option value="${id}" ${index === position ? 'selected' : ''}>${index + 1}${index === position ? ' (текущая)' : ''}</option>`).join('')}
+      </select></label>`,
+    submit: async data => {
+      const anchorId = data.get('position');
+      if (anchorId === item.id) return;
+      const after = workout.items.findIndex(entry => entry.id === anchorId) > position;
+      await save(next => moveExercise(next, workout.id, template, item.id, anchorId, after));
+      return { message: 'Порядок упражнений сохранён' };
+    },
+  });
 }
 
 function editExercise(exercise, workout, item, template = false) {
@@ -652,6 +702,7 @@ document.addEventListener('click', async event => {
         next => removeEntry(next.exercises, id));
       break;
     case 'choose-item': if (workout) pickExercise(workout); break;
+    case 'move-item': if (item) chooseExercisePosition(workout, item, template, button); break;
     case 'new-and-attach': if (workout) editExercise(null, workout, null, template); break;
     case 'edit-item': if (item) editExercise(null, workout, item, template); break;
     case 'attach':

@@ -216,8 +216,31 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
 .workout-head .page-heading { margin-bottom: 13px; }
 .workout-totals { display: flex; flex-wrap: wrap; gap: 8px 18px; padding-bottom: 16px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: .9rem; font-variant-numeric: tabular-nums; }
 .workout-items { display: grid; gap: 12px; }
-.exercise-entry { min-width: 0; padding: 10px 16px 7px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.exercise-entry { position: relative; min-width: 0; padding: 10px 16px 7px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 .entry-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 8px; }
+.entry-head h3 { overflow-wrap: anywhere; }
+.exercise-order-hint { margin-bottom: 12px; font-size: .9rem; }
+.exercise-grip {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 3px;
+  min-width: 44px; min-height: 44px; padding: 4px 5px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--paper); color: var(--muted);
+}
+button.exercise-grip { cursor: grab; touch-action: none; user-select: none; -webkit-touch-callout: none; }
+button.exercise-grip:active { cursor: grabbing; }
+.exercise-number { color: var(--accent); font-weight: 720; font-variant-numeric: tabular-nums; }
+.exercise-entry[data-dragging] { opacity: .6; }
+.exercise-entry[data-drop]::after {
+  content: ""; position: absolute; z-index: 1; inset-inline: 0; height: 3px;
+  border-radius: 2px; background: var(--accent); pointer-events: none;
+}
+.exercise-entry[data-drop="before"]::after { top: -8px; }
+.exercise-entry[data-drop="after"]::after { bottom: -8px; }
+.exercise-drag-label {
+  position: fixed; z-index: 4; inset: 0 auto auto 0; pointer-events: none; user-select: none;
+  max-width: min(360px, calc(100% - 36px)); padding: 9px 12px; border: 1px solid var(--accent);
+  border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); color: var(--ink);
+  font-weight: 700; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
 .exercise-note { font-size: .95rem; font-weight: 400; white-space: pre-wrap; overflow-wrap: anywhere; }
 .set-table { border-collapse: collapse; width: 100%; text-align: left; font-variant-numeric: tabular-nums; }
 .set-table th, .set-table td { border-top: 1px solid var(--line); padding: 0 4px; }
@@ -289,7 +312,8 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
 .sheet-footer { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--line); padding-block: 12px; }
 .field { display: grid; gap: 5px; min-width: 0; color: var(--ink); font-size: .9rem; font-weight: 670; }
 .field + .field, .field + .muscle-fields { margin-top: 15px; }
-.field input, .field textarea { width: 100%; min-width: 0; min-height: 46px; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--paper); color: var(--ink); font-size: 1rem; font-weight: 550; accent-color: var(--accent); }
+.form-context + .field { margin-top: 12px; }
+.field input, .field textarea, .field select { width: 100%; min-width: 0; min-height: 46px; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--paper); color: var(--ink); font: inherit; font-size: 1rem; font-weight: 550; accent-color: var(--accent); }
 .field textarea { resize: vertical; font-weight: 400; }
 .field input[type="date"] { appearance: none; text-align: left; }
 .field-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-block: 10px; }
@@ -323,6 +347,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
 
 @media (hover: hover) and (pointer: fine) {
   #nav a:hover, .icon-button:hover, .secondary:hover, .text-button:hover, .picker-item:hover, .history-row:hover { background: var(--surface-hover); }
+  button.exercise-grip:hover { background: var(--surface-hover); color: var(--ink); }
   .calendar-top .icon-button:not(:disabled):hover { background: var(--nav-selected); }
   .calendar-day:not([aria-current="date"]):hover { border-color: var(--line-strong); }
   .primary:not(:disabled):hover { background: var(--accent-hover); }

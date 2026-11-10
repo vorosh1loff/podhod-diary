@@ -213,6 +213,7 @@ export function catalog(state, selection) {
 
 export function workoutView(workout, { date, history = false, template = false, unit } = {}) {
   const stats = workoutStats(workout);
+  const canReorder = workout.items.length > 1;
   return `${workoutBackLink(date, history, template)}
     <div class="workout-head">
       <div class="page-heading"><div><h1>${esc(workout.name)}</h1><p>${template ? 'Шаблон тренировки' : `${formatDate(workout.date)} · ${workout.startedAt ? `начало в ${formatStart(workout)}` : formatStart(workout)}`}</p></div>
@@ -228,9 +229,13 @@ export function workoutView(workout, { date, history = false, template = false, 
         ${action('choose-item', 'Добавить упражнение', 'plus', 'primary')}
       </div>
       ${template ? '' : '<p class="muted session-edit-hint">Замены сохраняются только в этой записи тренировки.</p>'}
+      ${canReorder ? '<p class="muted exercise-order-hint">Тяните за номер или нажмите, чтобы выбрать позицию.</p>' : ''}
       <div class="workout-items">
-        ${workout.items.map(item => `<article class="exercise-entry">
+        ${workout.items.map((item, index) => `<article class="exercise-entry" data-exercise-id="${item.id}">
           <div class="entry-head">
+            ${canReorder ? `<button type="button" class="exercise-grip" data-action="move-item" data-id="${item.id}"
+              aria-label="Переместить «${esc(item.name)}», позиция ${index + 1}">${icon('grip', 14)}<span class="exercise-number">${index + 1}</span></button>` :
+              `<span class="exercise-grip"><span class="sr-only">Позиция </span><span class="exercise-number">${index + 1}</span></span>`}
             <div class="row-copy"><h3>${esc(item.name)}</h3>
               ${item.note ? `<p class="exercise-note">${esc(item.note)}</p>` : ''}
               <span>${muscleNames(item.primary)}</span>
