@@ -168,7 +168,8 @@ export const validSet = (kg, reps) => typeof kg === 'number' && Number.isFinite(
 export function backupOf(state) {
   return { format: 'podhod-training-diary', version: 3, exportedAt: new Date().toISOString(),
     exercises: state.exercises, workouts: state.workouts, templates: state.templates ?? [],
-    loadUnit: state.loadUnit ?? 'points', measurements: state.measurements ?? [] };
+    loadUnit: state.loadUnit ?? 'points', measurements: state.measurements ?? [],
+    nextTraining: state.nextTraining ?? null };
 }
 
 export function parseBackup(value) {
@@ -220,6 +221,13 @@ export function parseBackup(value) {
   const workouts = value.workouts.map(entry => workout(entry, false));
   const templates = value.version >= 2 ? value.templates.map(entry => workout(entry, true)) : [];
   check(hasUniqueIDs(exercises) && hasUniqueIDs(workouts) && hasUniqueIDs(templates), 'В файле повторяются идентификаторы записей.');
-  return { exercises, workouts, templates, ...(value.version >= 2 ? { loadUnit: value.loadUnit } : {}),
+  let nextTraining = null;
+  if (value.nextTraining != null) {
+    const { templateId, date } = value.nextTraining;
+    check((templateId === '' || templates.some(template => template.id === templateId)) && (date === '' || isDate(date)),
+      'В копии повреждён план следующей тренировки.');
+    if (templateId || date) nextTraining = { templateId, date };
+  }
+  return { exercises, workouts, templates, nextTraining, ...(value.version >= 2 ? { loadUnit: value.loadUnit } : {}),
     ...(value.version === 3 ? { measurements: parseMeasurements(value.measurements) } : {}) };
 }

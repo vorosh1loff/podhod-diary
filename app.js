@@ -134,12 +134,15 @@ function restoreFocus(trigger) {
 
 function openDialog({ title, content, label = 'Сохранить', danger = false, wide = false, submit, trigger = document.activeElement }) {
   const alreadyOpen = dialog.open;
-  if (!alreadyOpen) dialogTrigger = trigger;
+  if (!alreadyOpen) {
+    dialogTrigger = trigger?.matches('button, a') ? trigger : null;
+    if (document.activeElement.matches('input, textarea')) document.activeElement.blur();
+  }
   submitDialog = submit;
   dialog.className = wide ? 'sheet wide' : 'sheet';
   dialog.innerHTML = `<div class="sheet-inner">
     <header class="sheet-header"><h2 id="dialog-title">${title}</h2>
-      <button class="icon-button" type="button" data-action="close" aria-label="Закрыть">${icon('close')}</button>
+      <button class="icon-button" type="button" data-action="close" aria-label="Закрыть" autofocus>${icon('close')}</button>
     </header>
     <form id="dialog-form">
       <div class="sheet-body">${content}<p class="form-error" id="form-error" role="alert" hidden></p></div>
@@ -149,9 +152,30 @@ function openDialog({ title, content, label = 'Сохранить', danger = fal
       </footer>` : ''}
     </form>
   </div>`;
+  positionDialog();
   if (!alreadyOpen) dialog.showModal();
-  const target = dialog.querySelector('[autofocus], input:not([type=checkbox])') || dialog.querySelector('[data-action=close]');
-  target.focus({ preventScroll: true });
+  else dialog.querySelector('.sheet-header button').focus({ preventScroll: true });
+}
+
+function positionDialog() {
+  const viewport = window.visualViewport;
+  if (!viewport) return;
+  dialog.style.setProperty('--sheet-viewport-height', `${viewport.height}px`);
+  dialog.style.setProperty('--sheet-viewport-center', `${viewport.offsetTop + viewport.height / 2}px`);
+}
+
+for (const event of ['resize', 'scroll']) {
+  window.visualViewport?.addEventListener(event, () => {
+    if (!dialog.open) return;
+    positionDialog();
+    const body = dialog.querySelector('.sheet-body');
+    const field = document.activeElement;
+    if (!body.contains(field)) return;
+    const bounds = body.getBoundingClientRect();
+    const target = field.getBoundingClientRect();
+    if (target.bottom > bounds.bottom) body.scrollTop += target.bottom - bounds.bottom + 8;
+    else if (target.top < bounds.top) body.scrollTop += target.top - bounds.top - 8;
+  });
 }
 
 function failForm(error) {
@@ -169,6 +193,12 @@ dialog.addEventListener('close', () => {
   }
 });
 dialog.addEventListener('cancel', event => { if (pending) event.preventDefault(); });
+dialog.addEventListener('invalid', event => {
+  event.preventDefault();
+  if (event.target === event.target.form.querySelector('input:invalid, textarea:invalid, select:invalid')) {
+    failForm(new Error('Проверьте обязательные поля и допустимые значения.'));
+  }
+}, true);
 
 dialog.addEventListener('submit', async event => {
   event.preventDefault();
@@ -243,6 +273,7 @@ function startWorkout(date) {
       await save(next => {
         const template = findEntry(trainingList(next, true), data.get('template'), 'Тренировка');
         next.workouts.unshift({ id, name: template.name, items: structuredClone(template.items), date, startedAt });
+        if (next.nextTraining?.templateId === template.id && next.nextTraining.date === date) next.nextTraining = null;
       });
       return { route: `workout/${id}/${date}`, message: 'Тренировка добавлена в календарь' };
     },
@@ -446,7 +477,7 @@ async function importBackup(file, trigger) {
   if (getRoute().page !== 'data' || dialog.open) return;
   openDialog({
     title: 'Заменить текущий дневник?',
-    content: `<p class="form-context">В копии ${plural(backup.workouts.length, 'тренировка', 'тренировки', 'тренировок')} и ${plural(backup.exercises.length, 'упражнение', 'упражнения', 'упражнений')}. Шаблонов тренировок: ${backup.templates.length}. Восстановление заменит упражнения, шаблоны и историю тренировок на этом устройстве. ${backup.measurements ? `История InBody тоже будет заменена. Замеров в копии: ${backup.measurements.length}.` : 'Текущая история InBody сохранится.'}</p>`,
+    content: `<p class="form-context">В копии ${plural(backup.workouts.length, 'тренировка', 'тренировки', 'тренировок')} и ${plural(backup.exercises.length, 'упражнение', 'упражнения', 'упражнений')}. Шаблонов тренировок: ${backup.templates.length}. Восстановление заменит упражнения, шаблоны, историю тренировок и план следующей тренировки на этом устройстве. ${backup.measurements ? `История InBody тоже будет заменена. Замеров в копии: ${backup.measurements.length}.` : 'Текущая история InBody сохранится.'}</p>`,
     label: 'Восстановить', danger: true, trigger,
     submit: async () => {
       await save(next => {
@@ -466,6 +497,31 @@ function filterRows(container, query) {
   container.querySelector('#catalog-empty').hidden = rows.some(row => !row.hidden);
 }
 
+async function updateNextTraining(field, value) {
+  const controls = main.querySelector('.next-training-controls');
+  try {
+    if (field === 'date' && value && (!isDate(value) || value < today())) {
+      throw new Error('Выберите сегодняшнюю дату или позже.');
+    }
+    await save(next => {
+      if (field === 'templateId' && value) findEntry(trainingList(next, true), value, 'Тренировка');
+      const plan = field ? { templateId: '', date: '', ...next.nextTraining, [field]: value } : null;
+      next.nextTraining = plan?.templateId || plan?.date ? plan : null;
+    });
+  } catch (error) {
+    showNotice(error instanceof DOMException ? 'Не удалось сохранить план тренировки.' : error.message);
+  }
+  if (!controls.isConnected) return;
+  const { templateId = '', date = '' } = state.nextTraining ?? {};
+  controls.querySelector('#next-training-template').value = templateId;
+  controls.querySelector('#next-training-date').value = date;
+  controls.querySelector('.next-training-date-label').hidden = Boolean(date);
+  const reset = main.querySelector('#next-training-reset');
+  reset.hidden = !templateId && !date;
+  if (!field && reset.hidden) controls.querySelector('#next-training-template').focus({ preventScroll: true });
+  main.querySelector('#next-training-past').hidden = !date || date >= today();
+}
+
 document.addEventListener('input', event => {
   const input = event.target;
   if (input.id === 'catalog-search') {
@@ -480,6 +536,10 @@ document.addEventListener('input', event => {
 
 document.addEventListener('change', event => {
   const input = event.target;
+  if (input.id === 'next-training-template' || input.id === 'next-training-date') {
+    void updateNextTraining(input.id === 'next-training-template' ? 'templateId' : 'date', input.value);
+    return;
+  }
   if (input.id === 'inbody-metric' && Object.hasOwn(INBODY_METRICS, input.value)) {
     inbodyMetric = input.value;
     main.querySelector('#inbody-chart').innerHTML = inbodyChart(state.measurements ?? [], inbodyMetric);
@@ -517,6 +577,7 @@ document.addEventListener('click', async event => {
   const set = item?.sets.find(entry => entry.id === setId);
   switch (command) {
     case 'close': dialog.close(); break;
+    case 'clear-next-training': void updateNextTraining(null); break;
     case 'new-measurement': editMeasurement(); break;
     case 'select-inbody': main.querySelector('#inbody-file').click(); break;
     case 'edit-measurement':
@@ -551,7 +612,11 @@ document.addEventListener('click', async event => {
       confirmRemove(template ? 'Удалить шаблон?' : 'Удалить запись тренировки?',
         template ? `«${esc(record.name)}» будет удалена из списка шаблонов. Записи в календаре сохранятся.` :
           `«${esc(record.name)}» и её подходы будут удалены из календаря и истории. Нагрузка пересчитается.`,
-        next => removeEntry(trainingList(next, template), record.id), command === 'delete-calendar' ? undefined : back);
+        next => {
+          const list = trainingList(next, template);
+          removeEntry(list, record.id);
+          if (template && (next.nextTraining?.templateId === record.id || !list.length)) next.nextTraining = null;
+        }, command === 'delete-calendar' ? undefined : back);
       break;
     }
     case 'select-exercises':

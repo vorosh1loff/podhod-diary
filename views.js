@@ -76,8 +76,33 @@ export function journal(state, metricKey) {
         </a></li>`).join('')}
       </ul>
     </section>
+    ${nextTrainingView(state, currentDate)}
     ${loadView(week, state.loadUnit, week)}
     ${inbodySummary(state.measurements ?? [], metricKey)}`;
+}
+
+function nextTrainingView({ templates = [], nextTraining }, currentDate) {
+  const { templateId = '', date = '' } = nextTraining ?? {};
+  return `<section class="next-training" aria-labelledby="next-training-title">
+    <div class="next-training-heading">
+      <div>
+        <h2 id="next-training-title">Следующая тренировка</h2>
+        <p id="next-training-past" class="muted" ${date && date < currentDate ? '' : 'hidden'}>Дата прошла</p>
+      </div>
+      <span id="next-training-reset" ${templates.length && (templateId || date) ? '' : 'hidden'}>${iconButton('clear-next-training', 'Очистить план', 'close')}</span>
+    </div>
+    ${templates.length ? `<div class="next-training-controls">
+      <select id="next-training-template" aria-label="Тренировка по плану">
+        <option value="">Выбрать</option>
+        ${templates.map(template => `<option value="${esc(template.id)}" ${template.id === templateId ? 'selected' : ''}>${esc(template.name)}</option>`).join('')}
+      </select>
+      <label class="next-training-date">
+        <span class="sr-only">Дата следующей тренировки</span>
+        <input id="next-training-date" type="date" min="${currentDate}" max="9999-12-31" value="${esc(date)}">
+        <span class="next-training-date-label" aria-hidden="true" ${date ? 'hidden' : ''}>Дата</span>
+      </label>
+    </div>` : '<p class="next-training-empty">Пока нет шаблонов. <a href="#exercises">К тренировкам</a></p>'}
+  </section>`;
 }
 
 const weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
