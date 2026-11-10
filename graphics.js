@@ -1,4 +1,5 @@
 const paths = {
+  fire: '<path fill="currentColor" stroke="none" d="M13 2c.7 4.6 6.5 6.1 6.5 12.1a7.5 7.5 0 1 1-15 0c0-2.6 1.3-5 3.3-6.7-.1 2 .8 3.1 1.7 3.7C9 7.8 11.8 5.6 13 2Zm-.2 10.2c-1 1.8-3.2 3-3.2 5a2.6 2.6 0 0 0 5.2 0c0-1.9-1.4-2.8-2-5Z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   arrow: '<path d="M5 12h14m-6-6 6 6-6 6"/>',
   back: '<path d="M19 12H5m6 6-6-6 6-6"/>',
@@ -23,49 +24,6 @@ const paths = {
 export function icon(name, size = 22) {
   return `<svg aria-hidden="true" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths[name]}</svg>`;
 }
-
-const AXIS_Y = 136;
-const DISC_THICKNESS = 18;
-const DISC_SPACING = 22;
-
-// Every round plate uses the same projection and sits on the same axle.
-function roundDisc(front, radius) {
-  const back = front - DISC_THICKNESS;
-  const oval = radius * 0.37;
-  const top = AXIS_Y - radius;
-  const bottom = AXIS_Y + radius;
-  return `<g class="dumbbell-disc">
-    <path d="M${front} ${top}H${back}A${oval} ${radius} 0 0 0 ${back} ${bottom}H${front}Z" class="dumbbell-side"/>
-    <path d="M${back + 2} ${top + 3}h${DISC_THICKNESS - 2}" class="dumbbell-highlight"/>
-    <ellipse cx="${front}" cy="${AXIS_Y}" rx="${oval}" ry="${radius}" class="dumbbell-face"/>
-    <ellipse cx="${front}" cy="${AXIS_Y}" rx="${oval - 3}" ry="${radius - 7}" class="dumbbell-rim"/>
-  </g>`;
-}
-
-const discRadii = [34, 47, 60];
-const leftStack = discRadii.map((radius, index) => roundDisc(101 + index * DISC_SPACING, radius)).join('');
-const rightStack = [...discRadii].reverse().map((radius, index) => roundDisc(301 + index * DISC_SPACING, radius)).join('');
-
-export const dumbbellArt = `<svg class="dumbbell-art" viewBox="0 0 440 270" fill="none" aria-hidden="true">
-  <defs>
-    <pattern id="grip-texture" width="8" height="8" patternUnits="userSpaceOnUse">
-      <path d="M-4 8 4 0m0 8 8-8M0 0l8 8" class="dumbbell-knurl"/>
-    </pattern>
-  </defs>
-  <g class="dumbbell-guides">
-    <path d="M40 235h362M98 24v196M54 43h118M53 170h26m-13-13v26m304-66h30m-15-15v30"/>
-    <path d="M184 239v10m12-10v5m12-5v5m12-5v5m12-5v10m12-10v5m12-5v5m12-5v5m12-5v10m12-10v5m12-5v5m12-5v5m12-5v10"/>
-  </g>
-  <g transform="rotate(17 225 136)" stroke-linejoin="round">
-    ${leftStack}
-    <rect x="144" y="124" width="162" height="24" rx="9" class="dumbbell-bar"/>
-    <rect x="181" y="123" width="91" height="26" rx="5" class="dumbbell-grip"/>
-    <rect x="186" y="126" width="81" height="20" rx="3" fill="url(#grip-texture)"/>
-    <path d="M176 128v16m101-16v16" class="dumbbell-collars"/>
-    ${rightStack}
-    <ellipse cx="345" cy="${AXIS_Y}" rx="4.5" ry="11" class="dumbbell-grip"/>
-  </g>
-</svg>`;
 
 const commonMuscles = {
   shoulders: 'M34 49Q23 48 19 57L17 68Q25 70 30 64Z',

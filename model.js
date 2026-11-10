@@ -50,20 +50,25 @@ export const emptyLoad = () => Object.fromEntries(Object.keys(MUSCLES).map(key =
 export function currentWeek(workouts, date = today()) {
   const monday = new Date(date);
   monday.setUTCDate(monday.getUTCDate() - (monday.getUTCDay() + 6) % 7);
-  const start = monday.toISOString().slice(0, 10);
-  monday.setUTCDate(monday.getUTCDate() + 6);
-  const end = monday.toISOString().slice(0, 10);
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(monday);
+    day.setUTCDate(day.getUTCDate() + index);
+    return { date: day.toISOString().slice(0, 10), count: 0 };
+  });
+  const byDate = new Map(days.map(day => [day.date, day]));
   const load = emptyLoad();
   const muscleKg = emptyLoad();
   for (const workout of workouts) {
-    if (workout.date < start || workout.date > end) continue;
+    const day = byDate.get(workout.date);
+    if (!day) continue;
+    day.count += 1;
     const stats = workoutStats(workout);
     for (const key of Object.keys(MUSCLES)) {
       load[key] += stats.load[key];
       muscleKg[key] += stats.muscleKg[key];
     }
   }
-  return { start, end, load, muscleKg };
+  return { start: days[0].date, end: days.at(-1).date, days, load, muscleKg };
 }
 export const plural = (value, one, few, many) => {
   const ending = value % 10;

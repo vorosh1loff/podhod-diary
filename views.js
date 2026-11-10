@@ -1,6 +1,6 @@
 import { MUSCLES, number, plural, formatDate, formatStart, shortDate, workoutStats, currentWeek, today,
   INBODY_MAIN, INBODY_EXTRA, INBODY_SEGMENTS, INBODY_SEGMENT_FIELDS, INBODY_METRICS } from './model.js';
-import { icon, dumbbellArt, muscleArt } from './graphics.js';
+import { icon, muscleArt } from './graphics.js';
 
 export const esc = value => String(value).replace(/[&<>"']/g, character => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -56,20 +56,25 @@ export function journal(state, metricKey) {
     sets += totals.sets;
     volume += totals.volume;
   }
-  const week = currentWeek(state.workouts);
+  const currentDate = today();
+  const week = currentWeek(state.workouts, currentDate);
+  const count = week.days.reduce((sum, day) => sum + day.count, 0);
   return `
-    <section class="intro">
-      ${dumbbellArt}
-      <div class="intro-copy">
-        <h1>Тренировочный<br>дневник</h1>
-        <p>Записывайте подходы и смотрите, какие группы мышц поработали.</p>
-        <a class="button primary" href="#calendar">${icon('calendar', 20)}<span>Открыть календарь</span></a>
-      </div>
-    </section>
-    <section class="totals" aria-label="Итоги за всё время">
-      ${metric('Тренировки', state.workouts.length, 'calendar')}
-      ${metric('Подходы', sets, 'layers')}
-      ${metric('Объём, кг', volume, 'weights')}
+    <h1 class="sr-only">Дневник</h1>
+    <section class="week-overview" aria-label="Итоги и календарь недели">
+      <dl class="totals">
+        ${metric('Тренировки на этой неделе', count)}
+        ${metric('Подходы всего', sets)}
+        ${metric('Кг всего', volume)}
+      </dl>
+      <ul class="week-strip" aria-label="Текущая неделя, с понедельника по воскресенье">
+        ${week.days.map(({ date, count }, index) => `<li><a class="week-day" href="#calendar/${date}"
+          ${count ? 'data-trained' : ''} ${date === currentDate ? 'aria-current="date"' : ''}
+          aria-label="${formatDate(date)}, ${count ? countWorkouts(count) : 'без тренировок'}">
+          <span>${weekdays[index]}</span><time datetime="${date}">${Number(date.slice(-2))}</time>
+          <span class="week-fire" aria-hidden="true">${count ? icon('fire', 15) : ''}</span>
+        </a></li>`).join('')}
+      </ul>
     </section>
     ${loadView(week, state.loadUnit, week)}
     ${inbodySummary(state.measurements ?? [], metricKey)}`;
@@ -136,8 +141,8 @@ export function calendar(state, selectedDate) {
     <div class="calendar-history"><a class="button secondary" href="#history/${selectedDate}">${icon('journal', 20)} История</a></div>`;
 }
 
-function metric(label, value, symbol) {
-  return `<div class="metric"><span class="metric-label">${icon(symbol, 17)}${label}</span><strong>${number(value)}</strong></div>`;
+function metric(label, value) {
+  return `<div class="metric"><dt>${label}</dt><dd>${number(value)}</dd></div>`;
 }
 
 export function catalog(state, selection) {
