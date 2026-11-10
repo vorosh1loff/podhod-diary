@@ -1,5 +1,5 @@
 import { openStorage, readState, changeState } from './storage.js';
-import { today, isDate, validSet, parseBackup, backupOf, plural, formatDate, NOTE_LIMIT, validNote,
+import { today, isDate, validSet, parseBackup, backupOf, plural, formatDate, shortDate, NOTE_LIMIT, validNote,
   INBODY_FIELDS, INBODY_METRICS, parseMeasurement, parseMeasurements } from './model.js';
 import { icon } from './graphics.js';
 import { esc, navigation, journal, calendar, historyView, catalog, workoutView, workoutBackLink, dataView, muscleFields, action,
@@ -515,7 +515,7 @@ async function updateNextTraining(field, value) {
   const { templateId = '', date = '' } = state.nextTraining ?? {};
   controls.querySelector('#next-training-template').value = templateId;
   controls.querySelector('#next-training-date').value = date;
-  controls.querySelector('.next-training-date-label').hidden = Boolean(date);
+  controls.querySelector('.next-training-date-label').textContent = date ? shortDate(date) : 'Дата';
   const reset = main.querySelector('#next-training-reset');
   reset.hidden = !templateId && !date;
   if (!field && reset.hidden) controls.querySelector('#next-training-template').focus({ preventScroll: true });
@@ -596,7 +596,7 @@ document.addEventListener('click', async event => {
       if (route.page !== 'calendar' || !isDate(button.dataset.date)) break;
       history.replaceState(null, '', `#calendar/${button.dataset.date}`);
       render();
-      restoreFocus(button);
+      restoreFocus(command === 'calendar-today' ? main.querySelector('.calendar-day[aria-current="date"]') : button);
       break;
     case 'new-template': editWorkout(null, true); break;
     case 'start-workout':

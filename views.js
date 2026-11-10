@@ -99,7 +99,7 @@ function nextTrainingView({ templates = [], nextTraining }, currentDate) {
       <label class="next-training-date">
         <span class="sr-only">Дата следующей тренировки</span>
         <input id="next-training-date" type="date" min="${currentDate}" max="9999-12-31" value="${esc(date)}">
-        <span class="next-training-date-label" aria-hidden="true" ${date ? 'hidden' : ''}>Дата</span>
+        <span class="next-training-date-label" aria-hidden="true">${date ? shortDate(date) : 'Дата'}</span>
       </label>
     </div>` : '<p class="next-training-empty">Пока нет шаблонов. <a href="#exercises">К тренировкам</a></p>'}
   </section>`;
@@ -151,7 +151,7 @@ export function calendar(state, selectedDate) {
         </div>
         <div class="calendar-footer">
           <span class="calendar-legend">День с тренировкой</span>
-          ${action('calendar-today', 'Сегодня', null, 'text-button', `data-date="${currentDate}"`)}
+          ${currentDate.startsWith(monthKey) ? '' : iconButton('calendar-today', 'Перейти к текущей дате', 'calendar', `data-date="${currentDate}"`)}
         </div>
       </section>
       <section class="calendar-agenda" aria-labelledby="calendar-agenda-title">
@@ -256,7 +256,7 @@ export function workoutView(workout, { date, history = false, template = false, 
 export function workoutBackLink(date, history = false, template = false) {
   const target = template ? 'exercises' : history ? `history${date ? `/${date}` : ''}` : `calendar${date ? `/${date}` : ''}`;
   const label = template ? 'К тренировкам' : history ? 'К истории' : 'К календарю';
-  return `<a class="back-link" href="#${target}">${icon('back', 19)} ${label}</a>`;
+  return `<a class="button secondary workout-back" href="#${target}">${icon('back', 19)} ${label}</a>`;
 }
 
 function loadView(stats, unit, week) {
@@ -279,7 +279,8 @@ function loadView(stats, unit, week) {
         <div class="load-track" aria-hidden="true"><span style="--fraction:${values[key] / max}"></span></div>
         </th><td>${number(values[key])}</td></tr>`).join('')}</tbody>
     </table>
-    <details class="method"><summary>${icon('info', 18)} Как считаем</summary>
+    <details class="method load-method">
+      <summary class="button secondary">${icon('info', 18)} Как считаем ${icon('next', 14)}</summary>
       <p>Один подход даёт 1 балл каждой основной группе и 0,5 каждой вспомогательной.</p>
       <p>В кг считаем объём: вес × повторы. Для основной группы засчитывается весь объём подхода, для вспомогательной — половина. Поэтому значения по мышцам могут пересекаться.</p>
       <p>При 0 кг подход даёт баллы. Длина полос показывает нагрузку относительно самой нагруженной группы.</p>
