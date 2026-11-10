@@ -342,7 +342,10 @@ button.exercise-grip:active { cursor: grabbing; }
   position: fixed; z-index: 3; right: max(18px, env(safe-area-inset-right));
   bottom: var(--scroll-top-bottom);
   width: 48px; height: 48px; padding: 0; border-radius: 50%; box-shadow: var(--shadow);
+  transition: opacity 150ms var(--out), visibility 150ms,
+    transform 130ms var(--out), background-color 150ms var(--out);
 }
+.scroll-top[inert] { opacity: 0; visibility: hidden; pointer-events: none; }
 .scroll-top svg { transform: rotate(-90deg); }
 .main:has(.bulk-bar) ~ .scroll-top { bottom: calc(var(--scroll-top-bottom) + 88px); }
 .notice {
@@ -351,7 +354,7 @@ button.exercise-grip:active { cursor: grabbing; }
   background: var(--panel); color: var(--panel-ink);
   transition: transform 180ms var(--out), opacity 180ms var(--out);
 }
-.scroll-top:not([hidden]) ~ .notice {
+.scroll-top:not([inert]) ~ .notice {
   right: calc(max(18px, env(safe-area-inset-right)) + 60px);
   max-width: min(360px, calc(100% - 96px));
 }
@@ -413,6 +416,7 @@ button.exercise-grip:active { cursor: grabbing; }
 }
 @media (prefers-reduced-motion: reduce) {
   .button, .icon-button, .notice { transition: opacity 120ms linear; }
+  .scroll-top { transition: none; }
   .button:active, .icon-button:active, .js .notice:not(.shown) { transform: none; }
   .sheet[open] { animation: sheet-fade 120ms linear; }
   @keyframes sheet-fade { from { opacity: .55; } to { opacity: 1; } }

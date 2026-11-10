@@ -26,7 +26,9 @@ let displayedDay;
 const cancelExerciseReorder = enableExerciseReorder(main, dropExercise);
 
 function updateScrollTopButton() {
-  scrollTopButton.toggleAttribute('hidden', window.scrollY <= window.innerHeight);
+  const belowThreshold = window.scrollY <= window.innerHeight;
+  if (belowThreshold && document.activeElement === scrollTopButton) main.focus({ preventScroll: true });
+  scrollTopButton.toggleAttribute('inert', belowThreshold);
 }
 
 scrollTopButton.innerHTML = icon('arrow', 22);
