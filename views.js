@@ -165,7 +165,10 @@ export function workoutView(workout, calendarDate) {
       <div class="workout-items">
         ${workout.items.map(item => `<article class="exercise-entry">
           <div class="entry-head">
-            <div class="row-copy"><h3>${esc(item.name)}</h3><span>${muscleNames(item.primary)}</span></div>
+            <div class="row-copy"><h3>${esc(item.name)}</h3>
+              ${item.note ? `<p class="exercise-note">${esc(item.note)}</p>` : ''}
+              <span>${muscleNames(item.primary)}</span>
+            </div>
             <div class="row-actions">
               ${iconButton('edit-item', 'Настроить упражнение в тренировке', 'edit', `data-id="${item.id}"`)}
               ${iconButton('delete-item', 'Убрать из тренировки', 'trash', `data-id="${item.id}"`)}

@@ -65,6 +65,8 @@ export function workoutStats(workout) {
 const check = (valid, message) => { if (!valid) throw new Error(message); };
 const isID = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value);
 const isName = value => typeof value === 'string' && value.trim().length > 0 && value.trim().length <= 80;
+export const NOTE_LIMIT = 160;
+export const validNote = value => typeof value === 'string' && value.length <= NOTE_LIMIT;
 const hasUniqueIDs = items => new Set(items.map(item => item.id)).size === items.length;
 const validGroups = items => Array.isArray(items) && items.length <= Object.keys(MUSCLES).length &&
   items.every(key => typeof key === 'string' && Object.hasOwn(MUSCLES, key));
@@ -84,11 +86,13 @@ export function parseBackup(value) {
 
   function exercise(value) {
     check(isID(value?.id) && isName(value.name), 'У упражнения отсутствует название или идентификатор.');
-    const { id, name, primary, secondary } = value;
+    const { id, name, primary, secondary, note } = value;
     check(validGroups(primary) && primary.length > 0 && validGroups(secondary) &&
       new Set([...primary, ...secondary]).size === primary.length + secondary.length,
     'Проверьте основные и вспомогательные группы мышц в файле.');
-    return { id, name: name.trim(), primary: [...primary], secondary: [...secondary] };
+    check(note === undefined || validNote(note), `Заметка к упражнению должна быть текстом до ${NOTE_LIMIT} символов.`);
+    return { id, name: name.trim(), primary: [...primary], secondary: [...secondary],
+      ...(note?.trim() ? { note: note.trim() } : {}) };
   }
 
   const exercises = value.exercises.map(exercise);

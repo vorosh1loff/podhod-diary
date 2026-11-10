@@ -1,5 +1,5 @@
 import { openStorage, readState, changeState } from './storage.js';
-import { today, isDate, validSet, parseBackup, backupOf, plural } from './model.js';
+import { today, isDate, validSet, parseBackup, backupOf, plural, NOTE_LIMIT, validNote } from './model.js';
 import { icon } from './graphics.js';
 import { esc, navigation, journal, calendar, catalog, workoutView, workoutBackLink, dataView, muscleFields, action } from './views.js';
 
@@ -201,14 +201,18 @@ function editExercise(exercise, workout, item) {
     title: item ? 'Упражнение в тренировке' : exercise ? 'Редактировать упражнение' : 'Новое упражнение',
     wide: true,
     content: `${item ? '<p class="form-hint snapshot-hint">Изменения применятся к этой тренировке.</p>' : ''}
-      <label class="field">Название<input name="name" required maxlength="80" autocomplete="off" value="${esc(entry?.name || '')}" placeholder="Например, Тяга гантели"></label>${muscleFields(entry)}`,
+      <label class="field">Название<input name="name" required maxlength="80" autocomplete="off" value="${esc(entry?.name || '')}" placeholder="Например, Тяга гантели"></label>
+      <label class="field">Заметка (необязательно)<textarea name="note" maxlength="${NOTE_LIMIT}" rows="2" placeholder="Например, сиденье на 3, спинка на 5">${esc(entry?.note || '')}</textarea></label>
+      ${muscleFields(entry)}`,
     label: workout && !item ? 'Создать и добавить' : 'Сохранить',
     submit: async data => {
       const name = getName(data);
+      const note = String(data.get('note') ?? '').trim();
+      if (!validNote(note)) throw new Error(`Заметка должна быть не длиннее ${NOTE_LIMIT} символов.`);
       const primary = data.getAll('primary');
       const secondary = data.getAll('secondary');
       if (!primary.length) throw new Error('Отметьте хотя бы одну основную группу мышц.');
-      const updated = { id: entry?.id || crypto.randomUUID(), name, primary, secondary };
+      const updated = { id: entry?.id || crypto.randomUUID(), name, primary, secondary, note };
       await save(next => {
         if (item) {
           const target = findEntry(next.workouts, workout.id, 'Тренировка');
