@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#10141c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Тренировки">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Личный дневник силовых тренировок с историей и нагрузкой по мышцам.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="icon" href="./icons/icon-192.png">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+  <title>Тренировочный дневник</title>
+</head>
+<body>
+  <a class="skip" href="#content">К содержимому</a>
+  <header class="topbar">
+    <div class="frame top-inner">
+      <a class="brand" href="#journal" aria-label="Подход — дневник тренировок">
+        <img src="./icons/icon-192.png" width="38" height="38" alt="">
+        <span>Подход<span class="brand-period">.</span></span>
+      </a>
+      <nav id="nav" aria-label="Разделы дневника"></nav>
+      <div class="status" id="offline-status">Подготовка…</div>
+    </div>
+  </header>
+  <main id="content" class="frame main" tabindex="-1">
+    <h1>Тренировочный дневник</h1>
+    <p>Открываем локальное хранилище…</p>
+    <noscript>Для дневника нужен JavaScript. Включите его в настройках браузера и обновите страницу.</noscript>
+  </main>
+  <dialog id="dialog" aria-labelledby="dialog-title"></dialog>
+  <div id="notice" class="notice" role="status" aria-live="polite"></div>
+</body>
+</html>
