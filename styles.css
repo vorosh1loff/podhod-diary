@@ -170,6 +170,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
 .calendar-agenda > .button { margin-bottom: 12px; }
 .calendar-record { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--line); }
 .calendar-record .history-row { flex: 1; min-width: 0; border-bottom: 0; }
+.calendar-record .calendar-edit-hint { color: var(--accent); }
 .calendar-history { margin-top: 14px; }
 .history-table, .muscle-table { width: 100%; border-collapse: collapse; text-align: left; font-variant-numeric: tabular-nums; }
 .history-table th, .history-table td, .muscle-table th, .muscle-table td { padding: 10px 8px; border-bottom: 1px solid var(--line); }
@@ -177,7 +178,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
 .history-table tbody th { overflow-wrap: anywhere; }
 .history-table td:first-child, .detail-link { white-space: nowrap; }
 .detail-link { display: inline-flex; min-height: 44px; align-items: center; color: var(--accent); }
-.catalog-heading { align-items: center; flex-wrap: wrap; }
+.catalog-heading, .exercise-section-heading { align-items: center; flex-wrap: wrap; }
 .catalog-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .selection-check { width: 48px; flex: none; }
 .bulk-bar {
@@ -206,7 +207,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
 .empty-set { border-top: 1px solid var(--line); padding: 10px 4px 4px; font-size: .9rem; color: var(--muted); }
 .exercise-entry .text-button { padding-inline: 4px 10px; }
 .empty-workout { margin-bottom: 12px; }
-.add-exercise { margin-top: 10px; }
+.session-edit-hint { margin-bottom: 12px; font-size: .9rem; }
 .load-panel { background: var(--panel); color: var(--panel-ink); border-radius: var(--radius); padding: 22px; }
 .load-heading { align-items: center; flex-wrap: wrap; }
 .method p, .week-dates { color: var(--panel-muted); }

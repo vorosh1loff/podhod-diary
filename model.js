@@ -1,6 +1,6 @@
 export const MUSCLES = {
   chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', biceps: 'Бицепс',
-  triceps: 'Трицепс', forearms: 'Предплечья', abs: 'Корпус',
+  triceps: 'Трицепс', forearms: 'Предплечья', press: 'Пресс', abs: 'Корпус',
   quads: 'Квадрицепсы', hamstrings: 'Задняя поверхность бедра', glutes: 'Ягодицы', calves: 'Икры',
 };
 
@@ -14,7 +14,7 @@ const starters = [
   ['Сгибание рук с гантелями', ['biceps'], ['forearms']],
   ['Разгибание рук на блоке', ['triceps'], []],
   ['Отжимания', ['chest'], ['triceps', 'shoulders', 'abs']],
-  ['Скручивания', ['abs'], []],
+  ['Скручивания', ['press'], []],
   ['Ягодичный мост', ['glutes'], ['hamstrings']],
   ['Подъёмы на носки', ['calves'], []],
 ];

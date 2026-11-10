@@ -39,7 +39,9 @@ function calendarRows(workouts, date) {
   return `<ul class="history-list">${workouts.map(workout => `<li class="calendar-record">
     <a class="history-row" href="#workout/${workout.id}/${date}">
       <span class="row-icon">${icon('weights', 21)}</span>
-      <span class="row-copy"><strong>${esc(workout.name)}</strong><span>${formatStart(workout)}</span></span>
+      <span class="row-copy"><strong>${esc(workout.name)}</strong><span>${formatStart(workout)}</span>
+        <span class="calendar-edit-hint">Изменить упражнения</span>
+      </span>
     </a>
     ${iconButton('delete-calendar', 'Удалить запись из календаря', 'trash', `data-id="${workout.id}"`)}
   </li>`).join('')}</ul>`;
@@ -189,7 +191,11 @@ export function workoutView(workout, { date, history = false, template = false, 
       <div class="workout-totals"><span>${countExercises(workout.items.length)}</span><span>${countSets(stats.sets)}</span><span>${number(stats.volume)} кг объёма</span></div>
     </div>
     <section class="section" aria-labelledby="workout-items">
-      <div class="section-heading"><h2 id="workout-items">Упражнения</h2></div>
+      <div class="section-heading exercise-section-heading">
+        <h2 id="workout-items">Упражнения</h2>
+        ${action('choose-item', 'Добавить упражнение', 'plus', 'primary')}
+      </div>
+      ${template ? '' : '<p class="muted session-edit-hint">Замены сохраняются только в этой записи тренировки.</p>'}
       <div class="workout-items">
         ${workout.items.map(item => `<article class="exercise-entry">
           <div class="entry-head">
@@ -211,7 +217,6 @@ export function workoutView(workout, { date, history = false, template = false, 
         </article>`).join('')}
       </div>
       ${!workout.items.length ? '<p class="muted empty-workout">Выберите упражнение из каталога или создайте своё.</p>' : ''}
-      ${action('choose-item', 'Добавить упражнение', 'plus', 'primary add-exercise')}
     </section>
     ${loadView(stats, unit)}`;
 }
