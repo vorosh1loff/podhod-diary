@@ -9,6 +9,7 @@ import { esc, navigation, journal, calendar, historyView, catalog, workoutView, 
 const main = document.querySelector('#content');
 const nav = document.querySelector('#nav');
 const dialog = document.querySelector('#dialog');
+const scrollTopButton = document.querySelector('#scroll-top');
 const notice = document.querySelector('#notice');
 const status = document.querySelector('#offline-status');
 document.documentElement.classList.add('js');
@@ -23,6 +24,20 @@ let search = '';
 let selectedExercises = null;
 let displayedDay;
 const cancelExerciseReorder = enableExerciseReorder(main, dropExercise);
+
+function updateScrollTopButton() {
+  scrollTopButton.toggleAttribute('hidden', window.scrollY <= window.innerHeight);
+}
+
+scrollTopButton.innerHTML = icon('arrow', 22);
+scrollTopButton.addEventListener('click', () => {
+  main.focus({ preventScroll: true });
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+});
+window.addEventListener('scroll', updateScrollTopButton, { passive: true });
+window.addEventListener('resize', updateScrollTopButton);
+window.addEventListener('pageshow', updateScrollTopButton);
 
 function getRoute() {
   const [page, id, context, originDate] = location.hash.slice(1).split('/');
@@ -96,6 +111,7 @@ function render({ navigate = false } = {}) {
     window.scrollTo(0, 0);
     main.focus({ preventScroll: true });
   }
+  updateScrollTopButton();
 }
 
 function showNotice(message) {
