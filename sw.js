@@ -1,4 +1,4 @@
-const revision = "643b7948ddc70eab";
+const revision = "3d19835cb66d00ca";
 const files = ["./app.js","./graphics.js","./icons/apple-touch-icon.png","./icons/icon-192.png","./icons/icon-512.png","./icons/maskable-512.png","./icons/source.svg","./","./manifest.webmanifest","./model.js","./storage.js","./styles.css","./views.js"];
 const scope = new URL(self.registration.scope);
 const prefix = `podhod:${scope.pathname}:`;

@@ -357,3 +357,33 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
   .calendar-panel { padding: 9px; }
   .calendar-week, .calendar-days { gap: 3px; }
 }
+
+.inbody-panel .section-heading { margin-bottom: 10px; }
+.reading-summary {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 132px), 1fr)); gap: 10px;
+  margin: 14px 0 18px;
+}
+.reading-summary > div { padding: 10px; border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.reading-summary dt, .reading-summary .reading-delta { color: var(--muted); font-size: .8rem; }
+.reading-summary dd { margin: 2px 0 0; font-variant-numeric: tabular-nums; font-weight: 700; }
+.reading-summary .reading-delta { margin-top: 6px; font-weight: 400; }
+.reading-delta span { white-space: nowrap; }
+.chart-select { max-width: 310px; margin-bottom: 8px; }
+.chart-select select {
+  width: 100%; min-height: 44px; padding: 6px 9px; border: 1px solid var(--line-strong);
+  border-radius: 9px; color: var(--ink); background: var(--paper); font: 1rem var(--sans);
+}
+.inbody-chart { display: block; width: 100%; max-width: 640px; height: auto; }
+.inbody-chart text { fill: var(--muted); font: 11px var(--sans); }
+.inbody-chart .chart-grid { stroke: var(--line-strong); stroke-width: .7; }
+.inbody-chart .chart-line { fill: none; stroke: var(--accent); stroke-width: 2.1; stroke-linejoin: round; }
+.inbody-chart circle { fill: var(--accent); stroke: var(--paper); stroke-width: 1; }
+.inbody-history-link { margin-top: 15px; }
+.inbody-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.reading-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: end; }
+.reading-fields .field { margin: 0; overflow-wrap: anywhere; }
+.inbody-form-hint { margin-block: 10px 14px; }
+.reading-segment { min-width: 0; margin: 12px 0; padding: 8px; border: 1px solid var(--line); border-radius: 9px; }
+.reading-segment legend { padding: 0 4px; color: var(--ink); font-weight: 700; }
+.segment-table small { display: block; color: var(--muted); font-size: .73rem; }
+.segment-table th, .segment-table td { padding-inline: 4px; }

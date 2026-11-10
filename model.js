@@ -23,6 +23,7 @@ export const initialState = () => ({
   exercises: starters.map(([name, primary, secondary], index) => ({ id: `base-${index + 1}`, name, primary, secondary })),
   workouts: [],
   templates: [],
+  measurements: [],
   loadUnit: 'points',
   revision: 0,
 });
@@ -102,6 +103,57 @@ const isName = value => typeof value === 'string' && value.trim().length > 0 && 
 export const NOTE_LIMIT = 160;
 export const validNote = value => typeof value === 'string' && value.length <= NOTE_LIMIT;
 const hasUniqueIDs = items => new Set(items.map(item => item.id)).size === items.length;
+
+export const INBODY_MAIN = {
+  weight: ['Вес', 'кг'],
+  muscle: ['Мышечная масса', 'кг'],
+  fat: ['Жировая масса', 'кг'],
+  fatPercent: ['Процент жира', '%', 100],
+  lean: ['Безжировая масса', 'кг'],
+};
+export const INBODY_EXTRA = {
+  water: ['Вода', 'л'], protein: ['Белок', 'кг'], minerals: ['Минералы', 'кг'],
+  bmi: ['ИМТ', ''], visceral: ['Уровень висцерального жира', ''],
+  bmr: ['Основной обмен', 'ккал/сут.'], targetWeight: ['Оптимальный вес по отчёту', 'кг'],
+  recommendedCalories: ['Рекомендуемая калорийность по отчёту', 'ккал/сут.'],
+};
+export const INBODY_SEGMENTS = {
+  leftArm: 'Левая рука', rightArm: 'Правая рука', trunk: 'Торс', leftLeg: 'Левая нога', rightLeg: 'Правая нога',
+};
+export const INBODY_SEGMENT_FIELDS = {
+  leanKg: ['Безжировая масса', 'кг'], leanRef: ['Безжировая масса от референса', '%'],
+  fatKg: ['Жировая масса', 'кг'], fatRef: ['Жировая масса от референса', '%'],
+};
+export const INBODY_METRICS = { ...INBODY_MAIN, ...INBODY_EXTRA };
+export const INBODY_FIELDS = {
+  ...INBODY_METRICS,
+  ...Object.fromEntries(Object.keys(INBODY_SEGMENTS).flatMap(segment =>
+    Object.entries(INBODY_SEGMENT_FIELDS).map(([key, definition]) => [`${segment}_${key}`, definition]))),
+};
+
+export function parseMeasurement(entry) {
+  check(isID(entry?.id) && isDate(entry.date), 'Проверьте дату замера.');
+  check(entry.values && typeof entry.values === 'object' && !Array.isArray(entry.values), 'В замере нет показаний.');
+  const values = {};
+  for (const [key, value] of Object.entries(entry.values)) {
+    check(Object.hasOwn(INBODY_FIELDS, key), 'В замере есть неизвестный показатель.');
+    const [label, , max = 10000] = INBODY_FIELDS[key];
+    check(typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= max &&
+      Math.abs(value * 100 - Math.round(value * 100)) < 1e-7,
+    `Проверьте показатель «${label}». Допустимы числа от 0 до ${max} с двумя знаками после запятой.`);
+    values[key] = value;
+  }
+  check(Object.keys(values).length > 0, 'Укажите хотя бы один показатель.');
+  return { id: entry.id, date: entry.date, values };
+}
+
+export function parseMeasurements(raw) {
+  check(Array.isArray(raw), 'В файле нет списка замеров InBody.');
+  const entries = raw.map(parseMeasurement);
+  check(hasUniqueIDs(entries) && new Set(entries.map(entry => entry.date)).size === entries.length,
+    'В файле повторяются даты или идентификаторы замеров.');
+  return entries;
+}
 const validGroups = items => Array.isArray(items) && items.length <= Object.keys(MUSCLES).length &&
   items.every(key => typeof key === 'string' && Object.hasOwn(MUSCLES, key));
 export const validSet = (kg, reps) => typeof kg === 'number' && Number.isFinite(kg) &&
@@ -109,15 +161,16 @@ export const validSet = (kg, reps) => typeof kg === 'number' && Number.isFinite(
   Number.isInteger(reps) && reps >= 1 && reps <= 999;
 
 export function backupOf(state) {
-  return { format: 'podhod-training-diary', version: 2, exportedAt: new Date().toISOString(),
-    exercises: state.exercises, workouts: state.workouts, templates: state.templates ?? [], loadUnit: state.loadUnit ?? 'points' };
+  return { format: 'podhod-training-diary', version: 3, exportedAt: new Date().toISOString(),
+    exercises: state.exercises, workouts: state.workouts, templates: state.templates ?? [],
+    loadUnit: state.loadUnit ?? 'points', measurements: state.measurements ?? [] };
 }
 
 export function parseBackup(value) {
-  check(value?.format === 'podhod-training-diary' && [1, 2].includes(value.version),
+  check(value?.format === 'podhod-training-diary' && [1, 2, 3].includes(value.version),
     'Этот файл не распознан как резервная копия «Подхода».');
   check(Array.isArray(value.exercises) && Array.isArray(value.workouts), 'В файле нет корректных списков упражнений и тренировок.');
-  if (value.version === 2) {
+  if (value.version >= 2) {
     check(Array.isArray(value.templates) && ['kg', 'points'].includes(value.loadUnit), 'В копии повреждены программы тренировок или настройки.');
   }
 
@@ -160,7 +213,8 @@ export function parseBackup(value) {
     return result;
   }
   const workouts = value.workouts.map(entry => workout(entry, false));
-  const templates = value.version === 2 ? value.templates.map(entry => workout(entry, true)) : [];
+  const templates = value.version >= 2 ? value.templates.map(entry => workout(entry, true)) : [];
   check(hasUniqueIDs(exercises) && hasUniqueIDs(workouts) && hasUniqueIDs(templates), 'В файле повторяются идентификаторы записей.');
-  return { exercises, workouts, templates, ...(value.version === 2 ? { loadUnit: value.loadUnit } : {}) };
+  return { exercises, workouts, templates, ...(value.version >= 2 ? { loadUnit: value.loadUnit } : {}),
+    ...(value.version === 3 ? { measurements: parseMeasurements(value.measurements) } : {}) };
 }

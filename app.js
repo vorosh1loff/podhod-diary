@@ -1,7 +1,9 @@
 import { openStorage, readState, changeState } from './storage.js';
-import { today, isDate, validSet, parseBackup, backupOf, plural, formatDate, NOTE_LIMIT, validNote } from './model.js';
+import { today, isDate, validSet, parseBackup, backupOf, plural, formatDate, NOTE_LIMIT, validNote,
+  INBODY_FIELDS, INBODY_METRICS, parseMeasurement, parseMeasurements } from './model.js';
 import { icon } from './graphics.js';
-import { esc, navigation, journal, calendar, historyView, catalog, workoutView, workoutBackLink, dataView, muscleFields, action } from './views.js';
+import { esc, navigation, journal, calendar, historyView, catalog, workoutView, workoutBackLink, dataView, muscleFields, action,
+  measurementFields, inbodyChart, inbodyHistory, inbodyDetails } from './views.js';
 
 const main = document.querySelector('#content');
 const nav = document.querySelector('#nav');
@@ -19,12 +21,13 @@ let submitDialog;
 let search = '';
 let selectedExercises = null;
 let displayedDay;
+let inbodyMetric = 'weight';
 
 function getRoute() {
   const [page, id, context, originDate] = location.hash.slice(1).split('/');
   const fromHistory = context === 'history';
   const date = fromHistory ? originDate : context;
-  return { page: ['calendar', 'history', 'exercises', 'data', 'workout', 'template'].includes(page) ? page : 'journal',
+  return { page: ['calendar', 'history', 'exercises', 'data', 'workout', 'template', 'inbody'].includes(page) ? page : 'journal',
     id, fromHistory, fromDate: isDate(date) ? date : null };
 }
 
@@ -46,7 +49,7 @@ function render({ navigate = false } = {}) {
   const { page, id, fromDate, fromHistory } = getRoute();
   displayedDay = today();
   if (page !== 'exercises') selectedExercises = null;
-  const active = page === 'template' ? 'exercises' : ['history', 'workout'].includes(page) ? 'calendar' : page;
+  const active = page === 'template' ? 'exercises' : ['history', 'workout'].includes(page) ? 'calendar' : page === 'inbody' ? 'journal' : page;
   nav.innerHTML = navigation(active);
   switch (page) {
     case 'calendar':
@@ -69,6 +72,11 @@ function render({ navigate = false } = {}) {
     case 'data':
       main.innerHTML = dataView(state, standalone);
       break;
+    case 'inbody': {
+      const entries = state.measurements ?? [];
+      main.innerHTML = id ? inbodyDetails(entries.find(entry => entry.id === id)) : inbodyHistory(entries);
+      break;
+    }
     case 'workout':
     case 'template': {
       const template = page === 'template';
@@ -80,7 +88,7 @@ function render({ navigate = false } = {}) {
       break;
     }
     default:
-      main.innerHTML = journal(state);
+      main.innerHTML = journal(state, inbodyMetric);
   }
   if (navigate) {
     window.scrollTo(0, 0);
@@ -336,6 +344,78 @@ function confirmRemove(title, copy, change, route) {
   });
 }
 
+function editMeasurement(entry) {
+  openDialog({
+    title: entry ? 'Редактировать замер' : 'Новые показания InBody',
+    wide: true,
+    content: measurementFields(entry),
+    submit: async data => {
+      const values = {};
+      for (const [key, [label]] of Object.entries(INBODY_FIELDS)) {
+        const raw = String(data.get(key) ?? '').trim().replace(',', '.');
+        if (!raw) continue;
+        if (!/^\d+(\.\d{1,2})?$/.test(raw)) throw new Error(`Проверьте число в поле «${label}».`);
+        values[key] = Number(raw);
+      }
+      const record = parseMeasurement({ id: entry?.id ?? crypto.randomUUID(), date: data.get('date'), values });
+      await save(next => {
+        const entries = next.measurements ??= [];
+        if (entries.some(item => item.id !== record.id && item.date === record.date)) {
+          throw new Error('На эту дату уже есть замер. Его можно изменить в истории.');
+        }
+        if (entry) Object.assign(findEntry(entries, entry.id, 'Измерение'), record);
+        else entries.push(record);
+      });
+      return { message: 'Замер сохранён' };
+    },
+  });
+}
+
+async function readJson(file) {
+  try {
+    return JSON.parse((await file.text()).replace(/^\uFEFF/, ''));
+  } catch {
+    throw new Error('Не удалось прочитать JSON. Проверьте выбранный файл.');
+  }
+}
+
+async function importMeasurements(file, trigger) {
+  let entries;
+  try {
+    const raw = await readJson(file);
+    if (raw?.format !== 'podhod-inbody' || raw.version !== 1) throw new Error('Выберите файл истории InBody для «Подхода».');
+    entries = parseMeasurements(raw.measurements);
+  } catch (error) {
+    if (getRoute().page === 'inbody' && !dialog.open) {
+      openDialog({ title: 'Замеры не прочитаны', content: `<p class="form-context">${esc(error.message)}</p>`, trigger });
+    }
+    return;
+  }
+  if (getRoute().page !== 'inbody' || dialog.open) return;
+  openDialog({
+    title: 'Импорт замеров InBody',
+    content: `<p class="form-context">Замеров в файле: ${entries.length}. Даты, уже сохранённые в истории, будут пропущены.</p>`,
+    label: 'Добавить замеры', trigger,
+    submit: async () => {
+      let added = 0;
+      await save(next => {
+        const saved = next.measurements ??= [];
+        const dates = new Set(saved.map(entry => entry.date));
+        const ids = new Set(saved.map(entry => entry.id));
+        for (const entry of entries) {
+          if (dates.has(entry.date)) continue;
+          const id = ids.has(entry.id) ? crypto.randomUUID() : entry.id;
+          saved.push({ ...entry, id });
+          dates.add(entry.date);
+          ids.add(id);
+          added += 1;
+        }
+      });
+      return { message: `Добавлено замеров: ${added}` };
+    },
+  });
+}
+
 async function exportBackup() {
   const current = await readState();
   const blob = new Blob([JSON.stringify(backupOf(current), null, 2)], { type: 'application/json' });
@@ -353,13 +433,7 @@ async function importBackup(file, trigger) {
   let backup;
   let revision;
   try {
-    let raw;
-    try {
-      raw = JSON.parse((await file.text()).replace(/^\uFEFF/, ''));
-    } catch {
-      throw new Error('Не удалось прочитать JSON. Выберите файл, сохранённый из дневника.');
-    }
-    backup = parseBackup(raw);
+    backup = parseBackup(await readJson(file));
     revision = (await readState()).revision;
   } catch (error) {
     if (getRoute().page === 'data' && !dialog.open) {
@@ -372,7 +446,7 @@ async function importBackup(file, trigger) {
   if (getRoute().page !== 'data' || dialog.open) return;
   openDialog({
     title: 'Заменить текущий дневник?',
-    content: `<p class="form-context">В копии ${plural(backup.workouts.length, 'тренировка', 'тренировки', 'тренировок')} и ${plural(backup.exercises.length, 'упражнение', 'упражнения', 'упражнений')}. Шаблонов тренировок: ${backup.templates.length}. Восстановление заменит упражнения, шаблоны и историю на этом устройстве.</p>`,
+    content: `<p class="form-context">В копии ${plural(backup.workouts.length, 'тренировка', 'тренировки', 'тренировок')} и ${plural(backup.exercises.length, 'упражнение', 'упражнения', 'упражнений')}. Шаблонов тренировок: ${backup.templates.length}. Восстановление заменит упражнения, шаблоны и историю тренировок на этом устройстве. ${backup.measurements ? `История InBody тоже будет заменена. Замеров в копии: ${backup.measurements.length}.` : 'Текущая история InBody сохранится.'}</p>`,
     label: 'Восстановить', danger: true, trigger,
     submit: async () => {
       await save(next => {
@@ -406,6 +480,11 @@ document.addEventListener('input', event => {
 
 document.addEventListener('change', event => {
   const input = event.target;
+  if (input.id === 'inbody-metric' && Object.hasOwn(INBODY_METRICS, input.value)) {
+    inbodyMetric = input.value;
+    main.querySelector('#inbody-chart').innerHTML = inbodyChart(state.measurements ?? [], inbodyMetric);
+    return;
+  }
   if (input.name === 'selected-exercise' && selectedExercises) {
     if (input.checked) selectedExercises.add(input.value);
     else selectedExercises.delete(input.value);
@@ -413,10 +492,12 @@ document.addEventListener('change', event => {
     main.querySelector('[data-action="delete-selected"]').disabled = !selectedExercises.size;
     return;
   }
-  if (input.id !== 'backup-file') return;
+  if (!['backup-file', 'inbody-file'].includes(input.id)) return;
   const [file] = event.target.files;
   event.target.value = '';
-  if (file) void importBackup(file, main.querySelector('[data-action=select-backup]'));
+  if (!file) return;
+  if (input.id === 'inbody-file') void importMeasurements(file, main.querySelector('[data-action=select-inbody]'));
+  else void importBackup(file, main.querySelector('[data-action=select-backup]'));
 });
 
 document.addEventListener('click', async event => {
@@ -436,6 +517,17 @@ document.addEventListener('click', async event => {
   const set = item?.sets.find(entry => entry.id === setId);
   switch (command) {
     case 'close': dialog.close(); break;
+    case 'new-measurement': editMeasurement(); break;
+    case 'select-inbody': main.querySelector('#inbody-file').click(); break;
+    case 'edit-measurement':
+    case 'delete-measurement': {
+      const entry = state.measurements?.find(entry => entry.id === route.id);
+      if (!entry) break;
+      if (command === 'edit-measurement') editMeasurement(entry);
+      else confirmRemove('Удалить замер?', `Показания за ${formatDate(entry.date)} будут удалены из истории InBody.`,
+        next => removeEntry(next.measurements ?? [], entry.id), 'inbody');
+      break;
+    }
     case 'calendar-day':
     case 'calendar-prev':
     case 'calendar-next':

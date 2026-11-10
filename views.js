@@ -1,4 +1,5 @@
-import { MUSCLES, number, plural, formatDate, formatStart, shortDate, workoutStats, currentWeek, today } from './model.js';
+import { MUSCLES, number, plural, formatDate, formatStart, shortDate, workoutStats, currentWeek, today,
+  INBODY_MAIN, INBODY_EXTRA, INBODY_SEGMENTS, INBODY_SEGMENT_FIELDS, INBODY_METRICS } from './model.js';
 import { icon, dumbbellArt, muscleArt } from './graphics.js';
 
 export const esc = value => String(value).replace(/[&<>"']/g, character => ({
@@ -47,7 +48,7 @@ function calendarRows(workouts, date) {
   </li>`).join('')}</ul>`;
 }
 
-export function journal(state) {
+export function journal(state, metricKey) {
   let sets = 0;
   let volume = 0;
   for (const workout of state.workouts) {
@@ -70,7 +71,8 @@ export function journal(state) {
       ${metric('Подходы', sets, 'layers')}
       ${metric('Объём, кг', volume, 'weights')}
     </section>
-    ${loadView(week, state.loadUnit, week)}`;
+    ${loadView(week, state.loadUnit, week)}
+    ${inbodySummary(state.measurements ?? [], metricKey)}`;
 }
 
 const weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -278,4 +280,135 @@ export function muscleFields(exercise) {
         <label class="check-cell" title="${name}: основная"><input type="checkbox" name="primary" value="${key}" aria-label="${name}: основная" ${exercise?.primary.includes(key) ? 'checked' : ''}></label>
         <label class="check-cell" title="${name}: вспомогательная"><input type="checkbox" name="secondary" value="${key}" aria-label="${name}: вспомогательная" ${exercise?.secondary.includes(key) ? 'checked' : ''}></label>`).join('')}
     </div></fieldset>`;
+}
+
+const orderMeasurements = entries => [...entries].sort((a, b) => a.date.localeCompare(b.date));
+const displayReading = (value, unit = '') => value === undefined ? '—' :
+  `${number(value)}${unit === '%' ? '%' : unit ? ' ' + unit : ''}`;
+
+export function measurementFields(entry) {
+  const fields = (definitions, prefix = '') => Object.entries(definitions).map(([key, [label, unit]]) => {
+    const name = prefix + key;
+    return `<label class="field">${label}${unit ? ', ' + unit : ''}
+      <input name="${name}" inputmode="decimal" maxlength="10" autocomplete="off"
+        value="${entry?.values[name] ?? ''}" placeholder="—">
+    </label>`;
+  }).join('');
+  return `<label class="field">Дата замера<input name="date" type="date" required min="1000-01-01" max="9999-12-31" value="${entry?.date ?? today()}"></label>
+    <p class="form-hint inbody-form-hint">Заполните хотя бы один показатель. Пустые поля сохраняются как пропуски.</p>
+    <div class="reading-fields">${fields(INBODY_MAIN)}</div>
+    <details class="method"><summary>Дополнительные показатели</summary>
+      <div class="reading-fields">${fields(INBODY_EXTRA)}</div>
+    </details>
+    <details class="method"><summary>Руки, ноги и торс</summary>
+      <p class="muted">Проценты по сегментам вносятся относительно референса из отчёта.</p>
+      ${Object.entries(INBODY_SEGMENTS).map(([segment, label]) => `<fieldset class="reading-segment">
+        <legend>${label}</legend><div class="reading-fields">${fields(INBODY_SEGMENT_FIELDS, segment + '_')}</div>
+      </fieldset>`).join('')}
+    </details>`;
+}
+
+export function inbodyChart(entries, metricKey) {
+  const [label, unit] = INBODY_METRICS[metricKey];
+  const points = orderMeasurements(entries).filter(entry => entry.values[metricKey] !== undefined)
+    .map(entry => ({ date: entry.date, timestamp: Date.parse(entry.date), value: entry.values[metricKey] }));
+  if (!points.length) return '<p class="muted">Для этого показателя ещё нет замеров.</p>';
+  if (points.length === 1) {
+    return `<p class="muted">Один замер · ${shortDate(points[0].date)} · ${displayReading(points[0].value, unit)}. График появится после второго.</p>`;
+  }
+  const first = points[0];
+  const last = points.at(-1);
+  let low = first.value;
+  let high = low;
+  for (const { value } of points) {
+    low = Math.min(low, value);
+    high = Math.max(high, value);
+  }
+  const step = Math.max((high - low) / 4, 0.05);
+  const min = Math.max(0, low - step);
+  const max = high + step;
+  const axis = [max, (min + max) / 2, min];
+  const coordinates = points.map(point => ({
+    ...point,
+    x: 54 + 284 * (point.timestamp - first.timestamp) / (last.timestamp - first.timestamp),
+    y: 17 + 112 * (max - point.value) / (max - min),
+  }));
+  return `<svg class="inbody-chart" viewBox="0 0 350 158" role="img" aria-label="${label}: от ${displayReading(first.value, unit)} до ${displayReading(last.value, unit)}">
+    ${axis.map((value, i) => `<g><text x="47" y="${21 + i * 56}" text-anchor="end">${number(value)}</text><path d="M54 ${17 + i * 56}H338" class="chart-grid"/></g>`).join('')}
+    <polyline class="chart-line" points="${coordinates.map(p => `${p.x},${p.y}`).join(' ')}"/>
+    ${coordinates.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3.5"><title>${shortDate(p.date)} — ${displayReading(p.value, unit)}</title></circle>`).join('')}
+    <text x="54" y="150">${shortDate(first.date)}</text>
+    <text x="338" y="150" text-anchor="end">${shortDate(last.date)}</text>
+  </svg>`;
+}
+
+function readingDelta(current, base, unit) {
+  if (current === undefined || base === undefined) return '—';
+  const change = Math.round((current - base) * 100) / 100;
+  return `${change > 0 ? '+' : ''}${displayReading(change, unit === '%' ? 'п. п.' : unit)}`;
+}
+
+function inbodySummary(entries, metricKey = 'weight') {
+  const sorted = orderMeasurements(entries);
+  const latest = sorted.at(-1);
+  const previous = sorted.at(-2);
+  const first = sorted.length > 1 ? sorted[0] : undefined;
+  return `<section class="load-panel inbody-panel section" aria-labelledby="inbody-title">
+    <div class="section-heading load-heading">
+      <h2 id="inbody-title">Состав тела · InBody</h2>
+      ${action('new-measurement', 'Новые показания', 'plus', 'primary')}
+    </div>
+    ${latest ? `<p class="muted">Последний замер · ${shortDate(latest.date)}</p>
+      <dl class="reading-summary">${Object.entries(INBODY_MAIN).map(([key, [label, unit]]) => `<div>
+        <dt>${label}</dt><dd>${displayReading(latest.values[key], unit)}</dd>
+        ${previous && latest.values[key] !== undefined ? `<dd class="reading-delta">
+          К прошлому: <span>${readingDelta(latest.values[key], previous.values[key], unit)}</span><br>
+          К первому: <span>${readingDelta(latest.values[key], first.values[key], unit)}</span></dd>` : ''}
+      </div>`).join('')}</dl>
+      <label class="field chart-select">Показатель на графике<select id="inbody-metric">
+        ${Object.entries(INBODY_METRICS).map(([key, [label, unit]]) => `<option value="${key}" ${key === metricKey ? 'selected' : ''}>${label}${unit ? ', ' + unit : ''}</option>`).join('')}
+      </select></label>
+      <div id="inbody-chart">${inbodyChart(sorted, metricKey)}</div>` :
+      '<p class="muted">Добавьте первый замер. После второго здесь появится динамика.</p>'}
+    <a href="#inbody" class="button secondary inbody-history-link">${icon('journal', 20)} История замеров</a>
+  </section>`;
+}
+
+export function inbodyHistory(entries) {
+  const sorted = orderMeasurements(entries).reverse();
+  return `<a class="back-link" href="#journal">${icon('back', 19)} К дневнику</a>
+    <div class="page-heading"><div><h1>История InBody</h1>
+    <p>${plural(sorted.length, 'замер', 'замера', 'замеров')}</p></div></div>
+    <div class="inbody-actions">
+      ${action('new-measurement', 'Новые показания', 'plus', 'primary')}
+      ${action('select-inbody', 'Импорт замеров', 'upload')}
+      <input type="file" id="inbody-file" accept=".json,application/json" hidden>
+    </div>
+    ${sorted.length ? `<ul class="history-list">${sorted.map(entry => `<li>
+      <a class="history-row" href="#inbody/${entry.id}">
+        <span class="row-icon">${icon('calendar', 21)}</span>
+        <span class="row-copy"><strong>${formatDate(entry.date)}</strong><span>Вес ${displayReading(entry.values.weight, 'кг')} · жир ${displayReading(entry.values.fatPercent, '%')}</span></span>
+        <span class="row-arrow">${icon('arrow', 20)}</span>
+      </a></li>`).join('')}</ul>` : '<p class="muted">Здесь будут все ваши замеры InBody.</p>'}`;
+}
+
+export function inbodyDetails(entry) {
+  const back = `<a class="back-link" href="#inbody">${icon('back', 19)} К истории замеров</a>`;
+  if (!entry) return `${back}<h1>Замер не найден</h1>`;
+  const segments = Object.entries(INBODY_SEGMENTS).filter(([key]) =>
+    Object.keys(INBODY_SEGMENT_FIELDS).some(field => entry.values[key + '_' + field] !== undefined));
+  return `${back}<div class="page-heading"><div><h1>Замер InBody</h1><p>${formatDate(entry.date)}</p></div>
+    <div class="row-actions">${iconButton('edit-measurement', 'Редактировать замер', 'edit')}
+      ${iconButton('delete-measurement', 'Удалить замер', 'trash')}</div></div>
+    <table class="muscle-table reading-table"><thead><tr><th scope="col">Показатель</th><th scope="col">Значение</th></tr></thead>
+    <tbody>${Object.entries(INBODY_METRICS).filter(([key]) => entry.values[key] !== undefined)
+      .map(([key, [label, unit]]) => `<tr><th scope="row">${label}</th><td>${displayReading(entry.values[key], unit)}</td></tr>`).join('') ||
+      '<tr><td colspan="2">В этом замере заполнены данные по сегментам.</td></tr>'}</tbody></table>
+    ${segments.length ? `<section class="section"><h2>Руки, ноги и торс</h2>
+      <table class="muscle-table reading-table segment-table"><thead><tr><th scope="col">Сегмент</th><th scope="col">Безжировая</th><th scope="col">Жировая</th></tr></thead>
+      <tbody>${segments.map(([key, label]) => `<tr><th scope="row">${label}</th>
+        ${['lean', 'fat'].map(type => {
+          const ref = entry.values[`${key}_${type}Ref`];
+          return `<td>${displayReading(entry.values[`${key}_${type}Kg`], 'кг')}${ref === undefined ? '' : `<small>${displayReading(ref, '%')} от референса</small>`}</td>`;
+        }).join('')}</tr>`).join('')}</tbody></table></section>` : ''}`;
 }
