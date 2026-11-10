@@ -24,28 +24,29 @@ export function icon(name, size = 22) {
   return `<svg aria-hidden="true" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths[name]}</svg>`;
 }
 
-export const plateArt = `<svg class="plate-art" viewBox="0 0 440 270" fill="none" aria-hidden="true">
+const hexHead = `<path d="M-59-58H-14L10-17-6 39-52 57-82 17Z" class="dumbbell-edge"/>
+  <path d="M-59-58h38l-23 75h-38Z" class="dumbbell-side"/>
+  <path d="M-82 17h38l30 40h-38Z" class="dumbbell-edge"/>
+  <path d="M-21-58H24L48-17 32 39-14 57-44 17Z" class="dumbbell-face"/>
+  <path d="M-15-49h34L38-15 25 31-10 46-34 15Z" class="dumbbell-rim"/>
+  <path d="M-11-43h26" class="dumbbell-highlight"/>`;
+
+export const dumbbellArt = `<svg class="dumbbell-art" viewBox="0 0 440 270" fill="none" aria-hidden="true">
   <defs>
-    <pattern id="knurl" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
-      <path d="M1 0v6" class="plate-knurl"/>
+    <pattern id="grip-texture" width="8" height="8" patternUnits="userSpaceOnUse">
+      <path d="M0 4 4 0l4 4-4 4Z" class="dumbbell-knurl"/>
     </pattern>
   </defs>
-  <g class="plate-guides">
-    <path d="M2 230h421M295 6v255M154 41h244M183 210 391 22M21 190h60M49 179v22m349-40h30m-15-15v30"/>
-    <circle cx="295" cy="135" r="120"/><circle cx="295" cy="135" r="104"/>
+  <g class="dumbbell-guides">
+    <path d="M28 230h393M340 19v218M112 38h302M46 224 422 52M71 69h32m-16-16v32m287 120h34m-17-17v34"/>
+    <path d="M144 236v12m10-12v6m10-6v6m10-6v6m10-6v12m10-12v6m10-6v6m10-6v6m10-6v12m10-12v6m10-6v6m10-6v6m10-6v12"/>
   </g>
-  <g transform="rotate(-19 290 138)">
-    <ellipse cx="266" cy="145" rx="105" ry="93" class="plate-edge"/>
-    <ellipse cx="266" cy="145" rx="102" ry="91" fill="url(#knurl)"/>
-    <ellipse cx="281" cy="142" rx="106" ry="94" class="plate-mid"/>
-    <ellipse cx="296" cy="137" rx="106" ry="94" class="plate-face"/>
-    <ellipse cx="296" cy="137" rx="98" ry="86" class="plate-rim"/>
-    <ellipse cx="296" cy="137" rx="60" ry="52" class="plate-rim"/>
-    <ellipse cx="296" cy="137" rx="53" ry="46" class="plate-seam"/>
-    <path d="M249 106Q269 72 299 74M349 172q-16 29-45 30M210 117l24 7m119 24 24 7m-91-95 2 22m17 111 2 22" class="plate-marks"/>
-    <ellipse cx="296" cy="137" rx="19" ry="17" class="plate-hole"/>
-    <ellipse cx="293" cy="139" rx="13" ry="11" class="plate-core"/>
-    <path d="M205 144l-65 16-1 17 17 5 56-14m-73-8 18 6 48-12m-48 12-1 16" class="plate-bar"/>
+  <g transform="rotate(-22 253 138)" stroke-linejoin="round">
+    <g transform="translate(148 136) scale(.91)">${hexHead}</g>
+    <rect x="151" y="123" width="181" height="27" rx="13.5" class="dumbbell-bar"/>
+    <rect x="205" y="123" width="84" height="27" rx="5" class="dumbbell-grip"/>
+    <rect x="210" y="126" width="74" height="21" rx="3" fill="url(#grip-texture)"/>
+    <path d="M200 128v17m94-17v17" class="dumbbell-collars"/>
+    <g transform="translate(355 136)">${hexHead}</g>
   </g>
-  <g class="plate-guides"><path d="M107 235v12m10-12v6m10-6v6m10-6v6m10-6v12m10-12v6m10-6v6m10-6v6m10-6v12m10-12v6m10-6v6m10-6v6m10-6v12"/></g>
 </svg>`;

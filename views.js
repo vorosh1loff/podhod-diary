@@ -1,5 +1,5 @@
 import { MUSCLES, number, plural, formatDate, workoutStats, today } from './model.js';
-import { icon, plateArt } from './graphics.js';
+import { icon, dumbbellArt } from './graphics.js';
 
 export const esc = value => String(value).replace(/[&<>"']/g, character => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -45,7 +45,7 @@ export function journal(state) {
   const sorted = [...state.workouts].sort((a, b) => b.date.localeCompare(a.date));
   return `
     <section class="intro">
-      ${plateArt}
+      ${dumbbellArt}
       <div class="intro-copy">
         <h1>Тренировочный<br>дневник</h1>
         <p>Записывайте подходы и смотрите, какие группы мышц поработали.</p>
