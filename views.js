@@ -1,5 +1,5 @@
-import { MUSCLES, number, plural, formatDate, workoutStats, today } from './model.js';
-import { icon, dumbbellArt } from './graphics.js';
+import { MUSCLES, number, plural, formatDate, formatStart, shortDate, workoutStats, currentWeek, today } from './model.js';
+import { icon, dumbbellArt, muscleArt } from './graphics.js';
 
 export const esc = value => String(value).replace(/[&<>"']/g, character => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -17,21 +17,32 @@ const muscleNames = keys => keys.map(key => MUSCLES[key]).join(', ');
 export function navigation(active) {
   return [
     ['journal', 'Дневник', 'journal'], ['calendar', 'Календарь', 'calendar'],
-    ['exercises', 'Упражнения', 'weights'], ['data', 'Копии', 'storage'],
+    ['exercises', 'Тренировки и упражнения', 'weights'], ['data', 'Копии', 'storage'],
   ].map(([route, label, symbol]) =>
     `<a href="#${route}" ${active === route ? 'aria-current="page"' : ''}>${icon(symbol, 20)}<span>${label}</span></a>`).join('');
 }
 
-function historyRows(workouts, calendarDate) {
-  return `<ul class="history-list">${workouts.map(workout => {
-    const stats = workoutStats(workout);
-    return `<li><a class="history-row" href="#workout/${workout.id}${calendarDate ? `/${calendarDate}` : ''}">
-      <span class="row-icon">${icon(calendarDate ? 'weights' : 'calendar', 21)}</span>
-      <span class="row-copy"><strong>${esc(workout.name)}</strong><span>${calendarDate ? countExercises(workout.items.length) : formatDate(workout.date)}</span></span>
-      <span class="row-stats">${calendarDate ? '' : countExercises(workout.items.length)}<small>${countSets(stats.sets)}</small></span>
-      <span class="row-arrow">${icon('arrow', 20)}</span>
-    </a></li>`;
-  }).join('')}</ul>`;
+export function historyView(workouts, date) {
+  const sorted = [...workouts].sort((a, b) => b.date.localeCompare(a.date) ||
+    (b.startedAt || '').localeCompare(a.startedAt || ''));
+  return `${workoutBackLink(date)}
+    <div class="page-heading"><div><h1>История тренировок</h1><p>${countWorkouts(sorted.length)}</p></div></div>
+    ${sorted.length ? `<table class="history-table"><thead><tr>
+      <th scope="col">Дата</th><th scope="col">Тренировка</th><th scope="col"><span class="sr-only">Действия</span></th>
+    </tr></thead><tbody>${sorted.map(workout => `<tr><td><time datetime="${workout.date}">${shortDate(workout.date)}</time></td>
+      <th scope="row">${esc(workout.name)}</th>
+      <td><a class="detail-link" href="#workout/${workout.id}/history${date ? `/${date}` : ''}" aria-label="Подробнее о тренировке «${esc(workout.name)}»">Подробнее</a></td>
+    </tr>`).join('')}</tbody></table>` : '<p class="muted">Здесь появятся записи из календаря.</p>'}`;
+}
+
+function calendarRows(workouts, date) {
+  return `<ul class="history-list">${workouts.map(workout => `<li class="calendar-record">
+    <a class="history-row" href="#workout/${workout.id}/${date}">
+      <span class="row-icon">${icon('weights', 21)}</span>
+      <span class="row-copy"><strong>${esc(workout.name)}</strong><span>${formatStart(workout)}</span></span>
+    </a>
+    ${iconButton('delete-calendar', 'Удалить запись из календаря', 'trash', `data-id="${workout.id}"`)}
+  </li>`).join('')}</ul>`;
 }
 
 export function journal(state) {
@@ -42,14 +53,14 @@ export function journal(state) {
     sets += totals.sets;
     volume += totals.volume;
   }
-  const sorted = [...state.workouts].sort((a, b) => b.date.localeCompare(a.date));
+  const week = currentWeek(state.workouts);
   return `
     <section class="intro">
       ${dumbbellArt}
       <div class="intro-copy">
         <h1>Тренировочный<br>дневник</h1>
         <p>Записывайте подходы и смотрите, какие группы мышц поработали.</p>
-        ${action('new-workout', 'Новая тренировка', 'plus', 'primary')}
+        <a class="button primary" href="#calendar">${icon('calendar', 20)}<span>Открыть календарь</span></a>
       </div>
     </section>
     <section class="totals" aria-label="Итоги за всё время">
@@ -57,13 +68,7 @@ export function journal(state) {
       ${metric('Подходы', sets, 'layers')}
       ${metric('Объём, кг', volume, 'weights')}
     </section>
-    <section aria-labelledby="history-title" class="section">
-      <div class="section-heading"><h2 id="history-title">История тренировок</h2>${sorted.length ? `<span class="muted">${countWorkouts(sorted.length)}</span>` : ''}</div>
-      ${sorted.length ? historyRows(sorted) : `<div class="empty">
-        <span class="row-icon">${icon('journal', 24)}</span>
-        <div><h3>Здесь будет ваша история</h3><p>Создайте тренировку, добавьте упражнение и запишите первый подход.</p></div>
-      </div>`}
-    </section>`;
+    ${loadView(week, state.loadUnit, week)}`;
 }
 
 const weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -120,40 +125,63 @@ export function calendar(state, selectedDate) {
           <h2 id="calendar-agenda-title">${formatDate(selectedDate)}</h2>
           ${selected.length ? `<span class="muted">${countWorkouts(selected.length)}</span>` : ''}
         </div>
-        ${selected.length ? historyRows(selected, selectedDate) : '<p class="muted">В этот день тренировок нет.</p>'}
+        ${action('start-workout', 'Тренируюсь', 'plus', 'primary', `data-date="${selectedDate}"`)}
+        ${selected.length ? calendarRows(selected, selectedDate) : '<p class="muted">В этот день тренировок нет.</p>'}
       </section>
-    </div>`;
+    </div>
+    <div class="calendar-history"><a class="button secondary" href="#history/${selectedDate}">${icon('journal', 20)} История</a></div>`;
 }
 
 function metric(label, value, symbol) {
   return `<div class="metric"><span class="metric-label">${icon(symbol, 17)}${label}</span><strong>${number(value)}</strong></div>`;
 }
 
-export function catalog(state) {
+export function catalog(state, selection) {
   const sorted = [...state.exercises].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-  return `<div class="page-heading"><div><h1>Упражнения</h1><p>Каталог и группы мышц для расчёта нагрузки.</p></div>
-    ${action('new-exercise', 'Новое упражнение', 'plus', 'primary')}</div>
+  return `<div class="page-heading"><div><h1>Тренировки и упражнения</h1><p>Соберите тренировку и выберите её в календаре, когда начнёте.</p></div></div>
+    <section aria-labelledby="programs-title">
+      <div class="section-heading catalog-heading"><h2 id="programs-title">Мои тренировки</h2>
+        ${action('new-template', 'Новая тренировка', 'plus', 'primary')}</div>
+      ${state.templates?.length ? `<ul class="history-list">${state.templates.map(template => `<li>
+        <a class="history-row" href="#template/${template.id}">
+          <span class="row-icon">${icon('weights', 21)}</span>
+          <span class="row-copy"><strong>${esc(template.name)}</strong><span>${countExercises(template.items.length)}</span></span>
+          <span class="row-arrow">${icon('arrow', 20)}</span>
+        </a></li>`).join('')}</ul>` : '<p class="muted">Здесь будут тренировки, которые можно повторять.</p>'}
+    </section>
+    <section class="section" aria-labelledby="exercise-catalog-title">
+    <div class="section-heading catalog-heading"><h2 id="exercise-catalog-title">Упражнения</h2>
+      <div class="catalog-actions">
+        ${sorted.length || selection ? action('select-exercises', selection ? 'Отмена' : 'Выбрать', null) : ''}
+        ${selection ? '' : action('new-exercise', 'Новое упражнение', 'plus', 'secondary')}
+      </div></div>
     ${sorted.length ? `<label class="search-field">${icon('search', 20)}<input type="search" id="catalog-search" aria-label="Найти упражнение" placeholder="Найти упражнение"></label>` : ''}
     <ul class="catalog-list">${sorted.map(exercise => `<li class="catalog-row" data-exercise-row data-search="${esc(exercise.name.toLocaleLowerCase('ru'))}">
       <span class="row-icon">${icon('weights', 21)}</span>
       <span class="row-copy"><strong>${esc(exercise.name)}</strong><span>${muscleNames(exercise.primary)}</span>
       ${exercise.secondary.length ? `<span class="secondary-muscles">Дополнительно: ${muscleNames(exercise.secondary)}</span>` : ''}</span>
-      <div class="row-actions">
+      ${selection ? `<label class="check-cell selection-check"><input type="checkbox" name="selected-exercise" value="${exercise.id}"
+        aria-label="Выбрать «${esc(exercise.name)}»" ${selection.has(exercise.id) ? 'checked' : ''}></label>` : `<div class="row-actions">
         ${iconButton('edit-exercise', 'Редактировать упражнение', 'edit', `data-id="${exercise.id}"`)}
         ${iconButton('delete-exercise', 'Удалить упражнение', 'trash', `data-id="${exercise.id}"`)}
-      </div>
+      </div>`}
     </li>`).join('')}</ul>
     <div class="empty" id="catalog-empty" ${sorted.length ? 'hidden' : ''}>
       <span class="row-icon">${icon('search', 22)}</span>
       <div><h3>${sorted.length ? 'Совпадений нет' : 'Каталог пуст'}</h3><p>${sorted.length ? 'Попробуйте другое название.' : 'Добавьте упражнение и выберите его группы мышц.'}</p></div>
-    </div>`;
+    </div>
+    ${selection ? `<div class="bulk-bar">
+      <span id="bulk-count" aria-live="polite">Выбрано: ${selection.size}</span>
+      ${action('delete-selected', 'Удалить выбранные', 'trash', 'danger', selection.size ? '' : 'disabled')}
+    </div>` : ''}
+    </section>`;
 }
 
-export function workoutView(workout, calendarDate) {
+export function workoutView(workout, { date, history = false, template = false, unit } = {}) {
   const stats = workoutStats(workout);
-  return `${workoutBackLink(calendarDate)}
+  return `${workoutBackLink(date, history, template)}
     <div class="workout-head">
-      <div class="page-heading"><div><h1>${esc(workout.name)}</h1><p>${formatDate(workout.date)}</p></div>
+      <div class="page-heading"><div><h1>${esc(workout.name)}</h1><p>${template ? 'Шаблон тренировки' : `${formatDate(workout.date)} · ${workout.startedAt ? `начало в ${formatStart(workout)}` : formatStart(workout)}`}</p></div>
       <div class="row-actions">
         ${iconButton('edit-workout', 'Редактировать тренировку', 'edit')}
         ${iconButton('delete-workout', 'Удалить тренировку', 'trash')}
@@ -185,25 +213,39 @@ export function workoutView(workout, calendarDate) {
       ${!workout.items.length ? '<p class="muted empty-workout">Выберите упражнение из каталога или создайте своё.</p>' : ''}
       ${action('choose-item', 'Добавить упражнение', 'plus', 'primary add-exercise')}
     </section>
-    ${loadView(stats)}`;
+    ${loadView(stats, unit)}`;
 }
 
-export function workoutBackLink(calendarDate) {
-  return `<a class="back-link" href="#${calendarDate ? `calendar/${calendarDate}` : 'journal'}">${icon('back', 19)} ${calendarDate ? 'К календарю' : 'К истории'}</a>`;
+export function workoutBackLink(date, history = false, template = false) {
+  const target = template ? 'exercises' : history ? `history${date ? `/${date}` : ''}` : `calendar${date ? `/${date}` : ''}`;
+  const label = template ? 'К тренировкам' : history ? 'К истории' : 'К календарю';
+  return `<a class="back-link" href="#${target}">${icon('back', 19)} ${label}</a>`;
 }
 
-function loadView({ load, sets }) {
-  const ranked = Object.entries(load).filter(([, score]) => score > 0).sort((a, b) => b[1] - a[1]);
-  const max = ranked[0]?.[1] || 1;
+function loadView(stats, unit, week) {
+  const kg = unit === 'kg';
+  const values = kg ? stats.muscleKg : stats.load;
+  const ranked = Object.keys(MUSCLES).sort((a, b) => values[b] - values[a]);
+  const max = values[ranked[0]] || 1;
   return `<section class="load-panel section" aria-labelledby="load-title">
-    <div class="section-heading"><h2 id="load-title">Нагрузка по мышцам</h2>${sets ? `<span>${countSets(sets)}</span>` : ''}</div>
-    ${ranked.length ? `<ul class="load-list">${ranked.map(([key, value]) => `<li>
-      <div class="load-label"><span>${MUSCLES[key]}</span><strong>${number(value)}</strong></div>
-      <div class="load-track" aria-hidden="true"><span style="--fraction:${value / max}"></span></div>
-    </li>`).join('')}</ul>` : '<p class="load-empty">Здесь появится нагрузка, когда вы запишете первый подход.</p>'}
+    <div class="section-heading load-heading">
+      <h2 id="load-title">${week ? 'Нагрузка за неделю' : 'Нагрузка по мышцам'}</h2>
+      <div class="unit-picker" role="group" aria-label="Единица нагрузки">
+        ${action('load-unit', 'Кг', null, 'text-button', `data-id="kg" aria-pressed="${kg}"`)}
+        ${action('load-unit', 'Баллы', null, 'text-button', `data-id="points" aria-pressed="${!kg}"`)}
+      </div>
+    </div>
+    ${week ? `<p class="week-dates">Актуально на ${shortDate(week.start)} - ${shortDate(week.end)}</p>${muscleArt(values)}` : ''}
+    <table class="muscle-table">
+      <thead><tr><th scope="col">Группа мышц</th><th scope="col">${kg ? 'Кг' : 'Баллы'}</th></tr></thead>
+      <tbody>${ranked.map(key => `<tr><th scope="row">${MUSCLES[key]}
+        <div class="load-track" aria-hidden="true"><span style="--fraction:${values[key] / max}"></span></div>
+        </th><td>${number(values[key])}</td></tr>`).join('')}</tbody>
+    </table>
     <details class="method"><summary>${icon('info', 18)} Как считаем</summary>
-      <p>За каждый записанный подход каждая основная группа получает 1 балл, каждая вспомогательная — 0,5. Например, три подхода жима дают 3 балла груди и по 1,5 трицепсу и плечам.</p>
-      <p>Самая длинная полоса соответствует максимальному баллу в этой тренировке. Вес и повторы влияют на объём (кг × повторы), а баллы показывают число подходов с учётом роли мышцы.</p>
+      <p>Один подход даёт 1 балл каждой основной группе и 0,5 каждой вспомогательной.</p>
+      <p>В кг считаем объём: вес × повторы. Для основной группы засчитывается весь объём подхода, для вспомогательной — половина. Поэтому значения по мышцам могут пересекаться.</p>
+      <p>При 0 кг подход даёт баллы. Длина полос показывает нагрузку относительно самой нагруженной группы.</p>
     </details>
   </section>`;
 }
@@ -212,14 +254,14 @@ export function dataView(state, standalone) {
   return `<div class="page-heading"><div><h1>Резервные копии</h1><p>Дневник хранится на этом устройстве. JSON-файл позволяет перенести его или восстановить после очистки данных.</p></div></div>
     <div class="data-list">
       <section class="data-row"><div class="row-icon">${icon('download')}</div><div><h2>Сохранить копию</h2>
-      <p>${countWorkouts(state.workouts.length)} и ${countExercises(state.exercises.length)} в одном файле.</p>
+      <p>${countWorkouts(state.workouts.length)} и ${countExercises(state.exercises.length)}. Шаблоны тренировок тоже входят в копию.</p>
       ${action('export', 'Скачать JSON', 'download', 'primary')}</div></section>
       <section class="data-row"><div class="row-icon">${icon('upload')}</div><div><h2>Восстановить дневник</h2>
       <p>Выбранная копия заменит текущий дневник после вашего подтверждения.</p>
       ${action('select-backup', 'Выбрать JSON', 'upload')}
       <input id="backup-file" type="file" accept=".json,application/json" hidden></div></section>
       ${standalone ? '' : `<section class="data-row"><div class="row-icon">${icon('info')}</div><div><h2>Установка на iPhone</h2>
-      <p>В Safari откройте меню «Поделиться», выберите «На экран “Домой”» и включите «Открыть как веб‑приложение», если такой переключатель есть. Запустите дневник с иконки при включённом интернете и дождитесь надписи «Офлайн готов».</p></div></section>`}
+      <p>В Safari откройте меню «Поделиться», выберите «На экран “Домой”» и включите «Открыть как веб‑приложение», если такой переключатель есть. Запустите дневник с иконки при включённом интернете и дождитесь зелёной надписи «offline».</p></div></section>`}
     </div>`;
 }
 

@@ -1,7 +1,7 @@
 import { openStorage, readState, changeState } from './storage.js';
-import { today, isDate, validSet, parseBackup, backupOf, plural, NOTE_LIMIT, validNote } from './model.js';
+import { today, isDate, validSet, parseBackup, backupOf, plural, formatDate, NOTE_LIMIT, validNote } from './model.js';
 import { icon } from './graphics.js';
-import { esc, navigation, journal, calendar, catalog, workoutView, workoutBackLink, dataView, muscleFields, action } from './views.js';
+import { esc, navigation, journal, calendar, historyView, catalog, workoutView, workoutBackLink, dataView, muscleFields, action } from './views.js';
 
 const main = document.querySelector('#content');
 const nav = document.querySelector('#nav');
@@ -17,12 +17,18 @@ let noticeTimer;
 let dialogTrigger;
 let submitDialog;
 let search = '';
+let selectedExercises = null;
+let displayedDay;
 
 function getRoute() {
-  const [page, id, fromDate] = location.hash.slice(1).split('/');
-  return { page: ['calendar', 'exercises', 'data', 'workout'].includes(page) ? page : 'journal',
-    id, fromDate: isDate(fromDate) ? fromDate : null };
+  const [page, id, context, originDate] = location.hash.slice(1).split('/');
+  const fromHistory = context === 'history';
+  const date = fromHistory ? originDate : context;
+  return { page: ['calendar', 'history', 'exercises', 'data', 'workout', 'template'].includes(page) ? page : 'journal',
+    id, fromHistory, fromDate: isDate(date) ? date : null };
 }
+
+const trainingList = (data, template) => template ? (data.templates ?? []) : data.workouts;
 
 function findEntry(items, id, label) {
   const entry = items.find(item => item.id === id);
@@ -37,14 +43,24 @@ function removeEntry(items, id) {
 
 function render({ navigate = false } = {}) {
   if (!state) return;
-  const { page, id, fromDate } = getRoute();
-  nav.innerHTML = navigation(page === 'workout' ? (fromDate ? 'calendar' : 'journal') : page);
+  const { page, id, fromDate, fromHistory } = getRoute();
+  displayedDay = today();
+  if (page !== 'exercises') selectedExercises = null;
+  const active = page === 'template' ? 'exercises' : ['history', 'workout'].includes(page) ? 'calendar' : page;
+  nav.innerHTML = navigation(active);
   switch (page) {
     case 'calendar':
       main.innerHTML = calendar(state, isDate(id) ? id : today());
       break;
+    case 'history':
+      main.innerHTML = historyView(state.workouts, isDate(id) ? id : null);
+      break;
     case 'exercises':
-      main.innerHTML = catalog(state);
+      if (selectedExercises) {
+        const ids = new Set(state.exercises.map(exercise => exercise.id));
+        for (const id of selectedExercises) if (!ids.has(id)) selectedExercises.delete(id);
+      }
+      main.innerHTML = catalog(state, selectedExercises);
       if (main.querySelector('#catalog-search')) {
         main.querySelector('#catalog-search').value = search;
         filterRows(main, search);
@@ -53,9 +69,14 @@ function render({ navigate = false } = {}) {
     case 'data':
       main.innerHTML = dataView(state, standalone);
       break;
-    case 'workout': {
-      const workout = state.workouts.find(entry => entry.id === id);
-      main.innerHTML = workout ? workoutView(workout, fromDate) : `<h1>Тренировка не найдена</h1>${workoutBackLink(fromDate)}`;
+    case 'workout':
+    case 'template': {
+      const template = page === 'template';
+      const workout = trainingList(state, template).find(entry => entry.id === id);
+      const date = fromDate || (!fromHistory ? workout?.date : null);
+      main.innerHTML = workout
+        ? workoutView(workout, { date, history: fromHistory, template, unit: state.loadUnit })
+        : `<h1>Тренировка не найдена</h1>${workoutBackLink(date, fromHistory, template)}`;
       break;
     }
     default:
@@ -78,7 +99,7 @@ async function refresh() {
   if (!state || pending) return;
   try {
     const latest = await readState();
-    if (latest.revision > state.revision && !pending) {
+    if (!pending && (latest.revision > state.revision || displayedDay !== today())) {
       state = latest;
       render();
     }
@@ -170,22 +191,52 @@ function getName(data) {
   return name;
 }
 
-function editWorkout(workout) {
+function editWorkout(workout, template) {
   openDialog({
     title: workout ? 'Редактировать тренировку' : 'Новая тренировка',
     content: `<label class="field">Название<input name="name" required maxlength="80" autocomplete="off" value="${esc(workout?.name || '')}" placeholder="Например, Спина и бицепс"></label>
-      <label class="field">Дата<input name="date" type="date" required min="1000-01-01" max="9999-12-31" value="${workout?.date || today()}"></label>`,
+      ${template ? '' : `<label class="field">Дата<input name="date" type="date" required min="1000-01-01" max="9999-12-31" value="${workout.date}"></label>`}`,
     label: workout ? 'Сохранить' : 'Создать тренировку',
     submit: async data => {
       const name = getName(data);
       const date = data.get('date');
-      if (!isDate(date)) throw new Error('Выберите корректную дату.');
+      if (!template && !isDate(date)) throw new Error('Выберите корректную дату.');
       const id = workout?.id || crypto.randomUUID();
+      const fields = template ? { name } : { name, date };
       await save(next => {
-        if (workout) Object.assign(findEntry(next.workouts, id, 'Тренировка'), { name, date });
-        else next.workouts.unshift({ id, name, date, items: [] });
+        if (workout) Object.assign(findEntry(trainingList(next, template), id, 'Тренировка'), fields);
+        else (next.templates ??= []).unshift({ id, name, items: [] });
       });
-      return workout ? { message: 'Тренировка обновлена' } : { route: `workout/${id}`, message: 'Тренировка создана' };
+      return workout ? { message: 'Тренировка обновлена' } : { route: `template/${id}`, message: 'Тренировка создана' };
+    },
+  });
+}
+
+function startWorkout(date) {
+  const templates = state.templates ?? [];
+  if (!templates.length) {
+    openDialog({
+      title: 'Выберите тренировку',
+      content: '<p class="form-context">Сначала создайте тренировку с упражнениями.</p><a class="back-link" href="#exercises">К тренировкам и упражнениям</a>',
+    });
+    return;
+  }
+  openDialog({
+    title: 'Тренируюсь',
+    content: `<p class="form-context">${formatDate(date)}</p>
+      <fieldset class="program-options"><legend>Выберите тренировку</legend>
+        ${templates.map(template => `<label><input type="radio" name="template" value="${template.id}" required>
+          <span>${esc(template.name)}</span></label>`).join('')}
+      </fieldset>`,
+    label: 'Добавить в календарь',
+    submit: async data => {
+      const id = crypto.randomUUID();
+      const startedAt = new Date().toISOString();
+      await save(next => {
+        const template = findEntry(trainingList(next, true), data.get('template'), 'Тренировка');
+        next.workouts.unshift({ id, name: template.name, items: structuredClone(template.items), date, startedAt });
+      });
+      return { route: `workout/${id}/${date}`, message: 'Тренировка добавлена в календарь' };
     },
   });
 }
@@ -195,7 +246,7 @@ function attachExercise(workout, exercise) {
   workout.items.push({ ...exercise, exerciseId: exercise.id, id: crypto.randomUUID(), sets: [] });
 }
 
-function editExercise(exercise, workout, item) {
+function editExercise(exercise, workout, item, template = false) {
   const entry = item || exercise;
   openDialog({
     title: item ? 'Упражнение в тренировке' : exercise ? 'Редактировать упражнение' : 'Новое упражнение',
@@ -215,13 +266,13 @@ function editExercise(exercise, workout, item) {
       const updated = { id: entry?.id || crypto.randomUUID(), name, primary, secondary, note };
       await save(next => {
         if (item) {
-          const target = findEntry(next.workouts, workout.id, 'Тренировка');
+          const target = findEntry(trainingList(next, template), workout.id, 'Тренировка');
           Object.assign(findEntry(target.items, item.id, 'Упражнение'), updated);
           return;
         }
         if (exercise) Object.assign(findEntry(next.exercises, exercise.id, 'Упражнение'), updated);
         else next.exercises.push(updated);
-        if (workout) attachExercise(findEntry(next.workouts, workout.id, 'Тренировка'), updated);
+        if (workout) attachExercise(findEntry(trainingList(next, template), workout.id, 'Тренировка'), updated);
       });
       return { message: item ? 'Упражнение обновлено' : workout ? 'Упражнение добавлено' : 'Каталог обновлён' };
     },
@@ -242,7 +293,7 @@ function pickExercise(workout) {
   });
 }
 
-function editSet(workout, item, set) {
+function editSet(workout, item, set, template) {
   const previous = item.sets.at(-1);
   const index = set ? item.sets.indexOf(set) + 1 : item.sets.length + 1;
   openDialog({
@@ -251,20 +302,24 @@ function editSet(workout, item, set) {
       <div class="field-pair">
         <label class="field">Вес, кг<input name="kg" type="text" inputmode="decimal" required maxlength="7" autocomplete="off" value="${set ? set.kg : previous?.kg ?? ''}" placeholder="0"></label>
         <label class="field">Повторы<input name="reps" type="text" inputmode="numeric" required maxlength="3" autocomplete="off" value="${set ? set.reps : previous?.reps ?? ''}" placeholder="12"></label>
-      </div><p class="form-hint">Для упражнения без дополнительного веса укажите 0 кг.</p>`,
+      </div>
+      ${template && !set ? '<label class="field repeat-field">Количество подходов<input name="count" type="number" min="1" max="99" step="1" inputmode="numeric" value="1" required></label>' : ''}
+      <p class="form-hint">Для упражнения без дополнительного веса укажите 0 кг.</p>`,
     label: set ? 'Сохранить' : 'Записать подход',
     submit: async data => {
       const weight = String(data.get('kg')).trim().replace(',', '.');
       const repetitions = String(data.get('reps')).trim();
       const kg = Number(weight);
       const reps = Number(repetitions);
+      const count = Number(data.get('count') ?? 1);
+      if (!Number.isInteger(count) || count < 1 || count > 99) throw new Error('Укажите от 1 до 99 подходов.');
       if (!/^\d+(\.\d{1,2})?$/.test(weight) || !/^\d+$/.test(repetitions) || !validSet(kg, reps)) {
         throw new Error('Введите вес от 0 до 2 000 кг (до двух знаков после запятой) и от 1 до 999 повторов.');
       }
       await save(next => {
-        const target = findEntry(findEntry(next.workouts, workout.id, 'Тренировка').items, item.id, 'Упражнение');
+        const target = findEntry(findEntry(trainingList(next, template), workout.id, 'Тренировка').items, item.id, 'Упражнение');
         if (set) Object.assign(findEntry(target.sets, set.id, 'Подход'), { kg, reps });
-        else target.sets.push({ id: crypto.randomUUID(), kg, reps });
+        else target.sets.push(...Array.from({ length: count }, () => ({ id: crypto.randomUUID(), kg, reps })));
       });
       return { message: 'Подход сохранён' };
     },
@@ -317,7 +372,7 @@ async function importBackup(file, trigger) {
   if (getRoute().page !== 'data' || dialog.open) return;
   openDialog({
     title: 'Заменить текущий дневник?',
-    content: `<p class="form-context">В копии ${plural(backup.workouts.length, 'тренировка', 'тренировки', 'тренировок')} и ${plural(backup.exercises.length, 'упражнение', 'упражнения', 'упражнений')}. Восстановление заменит упражнения и историю на этом устройстве.</p>`,
+    content: `<p class="form-context">В копии ${plural(backup.workouts.length, 'тренировка', 'тренировки', 'тренировок')} и ${plural(backup.exercises.length, 'упражнение', 'упражнения', 'упражнений')}. Шаблонов тренировок: ${backup.templates.length}. Восстановление заменит упражнения, шаблоны и историю на этом устройстве.</p>`,
     label: 'Восстановить', danger: true, trigger,
     submit: async () => {
       await save(next => {
@@ -350,7 +405,15 @@ document.addEventListener('input', event => {
 });
 
 document.addEventListener('change', event => {
-  if (event.target.id !== 'backup-file') return;
+  const input = event.target;
+  if (input.name === 'selected-exercise' && selectedExercises) {
+    if (input.checked) selectedExercises.add(input.value);
+    else selectedExercises.delete(input.value);
+    main.querySelector('#bulk-count').textContent = `Выбрано: ${selectedExercises.size}`;
+    main.querySelector('[data-action="delete-selected"]').disabled = !selectedExercises.size;
+    return;
+  }
+  if (input.id !== 'backup-file') return;
   const [file] = event.target.files;
   event.target.value = '';
   if (file) void importBackup(file, main.querySelector('[data-action=select-backup]'));
@@ -366,7 +429,8 @@ document.addEventListener('click', async event => {
   if (!button || !state || pending) return;
   const { action: command, id, set: setId } = button.dataset;
   const route = getRoute();
-  const workout = state.workouts.find(entry => entry.id === route.id);
+  const template = route.page === 'template';
+  const workout = trainingList(state, template).find(entry => entry.id === route.id);
   const item = workout?.items.find(entry => entry.id === id);
   const exercise = state.exercises.find(entry => entry.id === id);
   const set = item?.sets.find(entry => entry.id === setId);
@@ -381,11 +445,48 @@ document.addEventListener('click', async event => {
       render();
       restoreFocus(button);
       break;
-    case 'new-workout': editWorkout(); break;
-    case 'edit-workout': if (workout) editWorkout(workout); break;
+    case 'new-template': editWorkout(null, true); break;
+    case 'start-workout':
+      if (route.page === 'calendar' && isDate(button.dataset.date)) startWorkout(button.dataset.date);
+      break;
+    case 'edit-workout': if (workout) editWorkout(workout, template); break;
     case 'delete-workout':
-      if (workout) confirmRemove('Удалить тренировку?', `«${esc(workout.name)}» и её подходы будут удалены из истории.`,
-        next => removeEntry(next.workouts, workout.id), route.fromDate ? `calendar/${route.fromDate}` : 'journal');
+    case 'delete-calendar': {
+      const record = command === 'delete-calendar' ? state.workouts.find(entry => entry.id === id) : workout;
+      if (!record) break;
+      const date = route.fromDate || record.date;
+      const back = template ? 'exercises' : route.fromHistory ? `history${route.fromDate ? `/${route.fromDate}` : ''}` : `calendar/${date}`;
+      confirmRemove(template ? 'Удалить шаблон?' : 'Удалить запись тренировки?',
+        template ? `«${esc(record.name)}» будет удалена из списка шаблонов. Записи в календаре сохранятся.` :
+          `«${esc(record.name)}» и её подходы будут удалены из календаря и истории. Нагрузка пересчитается.`,
+        next => removeEntry(trainingList(next, template), record.id), command === 'delete-calendar' ? undefined : back);
+      break;
+    }
+    case 'select-exercises':
+      selectedExercises = selectedExercises ? null : new Set();
+      render();
+      restoreFocus(button);
+      break;
+    case 'delete-selected': {
+      if (!selectedExercises?.size) break;
+      const ids = new Set(selectedExercises);
+      confirmRemove('Удалить выбранные упражнения?',
+        `Будет удалено из каталога: ${ids.size}. Упражнения в сохранённых тренировках и истории сохранятся.`,
+        next => { next.exercises = next.exercises.filter(exercise => !ids.has(exercise.id)); });
+      break;
+    }
+    case 'load-unit':
+      if (!['kg', 'points'].includes(id) || (state.loadUnit ?? 'points') === id) break;
+      pending = true;
+      try {
+        await save(next => { next.loadUnit = id; });
+        render();
+        restoreFocus(button);
+      } catch {
+        showNotice('Не удалось сохранить единицу нагрузки.');
+      } finally {
+        pending = false;
+      }
       break;
     case 'new-exercise': editExercise(); break;
     case 'edit-exercise': if (exercise) editExercise(exercise); break;
@@ -394,14 +495,14 @@ document.addEventListener('click', async event => {
         next => removeEntry(next.exercises, id));
       break;
     case 'choose-item': if (workout) pickExercise(workout); break;
-    case 'new-and-attach': if (workout) editExercise(null, workout); break;
-    case 'edit-item': if (item) editExercise(null, workout, item); break;
+    case 'new-and-attach': if (workout) editExercise(null, workout, null, template); break;
+    case 'edit-item': if (item) editExercise(null, workout, item, template); break;
     case 'attach':
       if (!workout) break;
       pending = true;
       dialog.querySelectorAll('button').forEach(control => { control.disabled = true; });
       try {
-        await save(next => attachExercise(findEntry(next.workouts, workout.id, 'Тренировка'),
+        await save(next => attachExercise(findEntry(trainingList(next, template), workout.id, 'Тренировка'),
           findEntry(next.exercises, id, 'Упражнение')));
         dialog.close();
         render();
@@ -415,13 +516,13 @@ document.addEventListener('click', async event => {
       break;
     case 'delete-item':
       if (item) confirmRemove('Убрать упражнение?', `«${esc(item.name)}» и его подходы будут удалены из этой тренировки.`,
-        next => removeEntry(findEntry(next.workouts, workout.id, 'Тренировка').items, id));
+        next => removeEntry(findEntry(trainingList(next, template), workout.id, 'Тренировка').items, id));
       break;
-    case 'new-set': if (item) editSet(workout, item); break;
-    case 'edit-set': if (set) editSet(workout, item, set); break;
+    case 'new-set': if (item) editSet(workout, item, null, template); break;
+    case 'edit-set': if (set) editSet(workout, item, set, template); break;
     case 'delete-set':
       if (set) confirmRemove('Удалить подход?', 'Нагрузка и объём тренировки пересчитаются автоматически.',
-        next => removeEntry(findEntry(findEntry(next.workouts, workout.id, 'Тренировка').items, id, 'Упражнение').sets, setId));
+        next => removeEntry(findEntry(findEntry(trainingList(next, template), workout.id, 'Тренировка').items, id, 'Упражнение').sets, setId));
       break;
     case 'export':
       try { await exportBackup(); } catch { showNotice('Не удалось сохранить копию. Попробуйте ещё раз.'); }
@@ -446,7 +547,7 @@ async function enableOffline() {
   const updateBadge = () => {
     const ready = Boolean(navigator.serviceWorker.controller);
     status.dataset.ready = String(ready);
-    status.innerHTML = ready ? `${icon('check', 16)} Офлайн готов` : 'Подготовка офлайна…';
+    status.textContent = ready ? 'offline' : 'Подготовка офлайна…';
   };
   navigator.serviceWorker.addEventListener('controllerchange', updateBadge);
   updateBadge();

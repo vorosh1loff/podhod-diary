@@ -25,12 +25,13 @@ export function icon(name, size = 22) {
 }
 
 const AXIS_Y = 136;
-const DISC_THICKNESS = 20;
+const DISC_THICKNESS = 18;
+const DISC_SPACING = 22;
 
 // Every round plate uses the same projection and sits on the same axle.
 function roundDisc(front, radius) {
   const back = front - DISC_THICKNESS;
-  const oval = radius * 0.42;
+  const oval = radius * 0.37;
   const top = AXIS_Y - radius;
   const bottom = AXIS_Y + radius;
   return `<g class="dumbbell-disc">
@@ -42,20 +43,20 @@ function roundDisc(front, radius) {
 }
 
 const discRadii = [34, 47, 60];
-const leftStack = discRadii.map((radius, index) => roundDisc(105 + index * DISC_THICKNESS, radius)).join('');
-const rightStack = [...discRadii].reverse().map((radius, index) => roundDisc(305 + index * DISC_THICKNESS, radius)).join('');
+const leftStack = discRadii.map((radius, index) => roundDisc(101 + index * DISC_SPACING, radius)).join('');
+const rightStack = [...discRadii].reverse().map((radius, index) => roundDisc(301 + index * DISC_SPACING, radius)).join('');
 
 export const dumbbellArt = `<svg class="dumbbell-art" viewBox="0 0 440 270" fill="none" aria-hidden="true">
   <defs>
     <pattern id="grip-texture" width="8" height="8" patternUnits="userSpaceOnUse">
-      <path d="M0 4 4 0l4 4-4 4Z" class="dumbbell-knurl"/>
+      <path d="M-4 8 4 0m0 8 8-8M0 0l8 8" class="dumbbell-knurl"/>
     </pattern>
   </defs>
   <g class="dumbbell-guides">
-    <path d="M28 230h393M340 19v218M112 38h302M46 224 422 52M71 69h32m-16-16v32m287 120h34m-17-17v34"/>
-    <path d="M144 236v12m10-12v6m10-6v6m10-6v6m10-6v12m10-12v6m10-6v6m10-6v6m10-6v12m10-12v6m10-6v6m10-6v6m10-6v12"/>
+    <path d="M40 235h362M98 24v196M54 43h118M53 170h26m-13-13v26m304-66h30m-15-15v30"/>
+    <path d="M184 239v10m12-10v5m12-5v5m12-5v5m12-5v10m12-10v5m12-5v5m12-5v5m12-5v10m12-10v5m12-5v5m12-5v5m12-5v10"/>
   </g>
-  <g transform="rotate(-22 225 136)" stroke-linejoin="round">
+  <g transform="rotate(17 225 136)" stroke-linejoin="round">
     ${leftStack}
     <rect x="144" y="124" width="162" height="24" rx="9" class="dumbbell-bar"/>
     <rect x="181" y="123" width="91" height="26" rx="5" class="dumbbell-grip"/>
@@ -65,3 +66,37 @@ export const dumbbellArt = `<svg class="dumbbell-art" viewBox="0 0 440 270" fill
     <ellipse cx="345" cy="${AXIS_Y}" rx="4.5" ry="11" class="dumbbell-grip"/>
   </g>
 </svg>`;
+
+const commonMuscles = {
+  shoulders: 'M34 49Q23 48 19 57L17 68Q25 70 30 64Z',
+  forearms: 'M15 96L25 98 19 125 13 135 7 132 10 114Z',
+  calves: 'M29 163L47 163 44 185 41 204 34 204 28 184Z',
+};
+const frontMuscles = {
+  chest: 'M34 51L48 54V73Q40 78 29 70Z',
+  abs: 'M30 73Q39 80 49 76V112L35 109 31 99Z',
+  biceps: 'M18 70Q23 72 29 67L27 88 25 96 15 94 15 82Z',
+  quads: 'M32 111L49 116 47 147 43 161 30 158 26 139Z',
+};
+const backMuscles = {
+  back: 'M35 50L49 43V108L35 104 29 78Z',
+  triceps: 'M18 70Q23 72 29 67L27 88 25 96 15 94 15 82Z',
+  glutes: 'M34 103L49 109V125Q39 133 28 125L29 112Z',
+  hamstrings: 'M28 127Q39 135 49 127L47 146 42 160 30 157 26 142Z',
+};
+
+export function muscleArt(load) {
+  const peak = Math.max(0, ...Object.values(load));
+  const figure = (regions, caption) => {
+    const half = Object.entries({ ...commonMuscles, ...regions }).map(([key, shape]) => {
+      const strength = peak && load[key] ? 0.32 + 0.68 * Math.sqrt(load[key] / peak) : 0;
+      return `<path class="muscle-zone${strength ? ' loaded' : ''}" d="${shape}" style="--heat:${strength}"/>`;
+    }).join('');
+    return `<div><svg viewBox="0 0 100 225" aria-hidden="true">
+      <path class="muscle-outline" d="M50 7Q36 7 37 22L40 35 43 39 42 44 34 47Q23 45 17 56L12 81 11 98 5 132 3 146 8 152 14 149 18 136 23 126 27 101 30 100 31 106 25 124 24 141 27 159 26 181 31 204 28 211 22 216 25 221 40 221 44 214 43 205 47 181 49 156 50 147 51 156 53 181 57 205 56 214 60 221 75 221 78 216 72 211 69 204 74 181 73 159 76 141 75 124 69 106 70 100 73 101 77 126 82 136 86 149 92 152 97 146 95 132 89 98 88 81 83 56Q77 45 66 47L58 44 57 39 60 35 63 22Q64 7 50 7Z"/>
+      <path class="muscle-outline" d="M41 40Q50 45 59 40"/>
+      ${half}<g transform="translate(100 0) scale(-1 1)">${half}</g>
+    </svg><span>${caption}</span></div>`;
+  };
+  return `<div class="muscle-map" aria-hidden="true">${figure(frontMuscles, 'Спереди')}${figure(backMuscles, 'Сзади')}</div>`;
+}

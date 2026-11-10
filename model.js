@@ -22,6 +22,8 @@ const starters = [
 export const initialState = () => ({
   exercises: starters.map(([name, primary, secondary], index) => ({ id: `base-${index + 1}`, name, primary, secondary })),
   workouts: [],
+  templates: [],
+  loadUnit: 'points',
   revision: 0,
 });
 
@@ -39,6 +41,29 @@ export function isDate(value) {
 export const number = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format;
 const dateFormat = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 export const formatDate = value => dateFormat.format(new Date(value)).replace(/\s*г\.$/, '');
+const clockFormat = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+export const formatStart = workout => workout.startedAt ? clockFormat.format(new Date(workout.startedAt)) : 'Время не указано';
+export const shortDate = date => date.split('-').reverse().join('.');
+export const emptyLoad = () => Object.fromEntries(Object.keys(MUSCLES).map(key => [key, 0]));
+
+export function currentWeek(workouts, date = today()) {
+  const monday = new Date(date);
+  monday.setUTCDate(monday.getUTCDate() - (monday.getUTCDay() + 6) % 7);
+  const start = monday.toISOString().slice(0, 10);
+  monday.setUTCDate(monday.getUTCDate() + 6);
+  const end = monday.toISOString().slice(0, 10);
+  const load = emptyLoad();
+  const muscleKg = emptyLoad();
+  for (const workout of workouts) {
+    if (workout.date < start || workout.date > end) continue;
+    const stats = workoutStats(workout);
+    for (const key of Object.keys(MUSCLES)) {
+      load[key] += stats.load[key];
+      muscleKg[key] += stats.muscleKg[key];
+    }
+  }
+  return { start, end, load, muscleKg };
+}
 export const plural = (value, one, few, many) => {
   const ending = value % 10;
   const teen = value % 100 >= 11 && value % 100 <= 14;
@@ -49,17 +74,26 @@ export function workoutStats(workout) {
   let sets = 0;
   let reps = 0;
   let volume = 0;
-  const load = Object.fromEntries(Object.keys(MUSCLES).map(key => [key, 0]));
+  const load = emptyLoad();
+  const muscleKg = emptyLoad();
   for (const item of workout.items) {
     sets += item.sets.length;
+    let itemVolume = 0;
     for (const set of item.sets) {
       reps += set.reps;
-      volume += set.kg * set.reps;
+      itemVolume += set.kg * set.reps;
     }
-    for (const key of item.primary) load[key] += item.sets.length;
-    for (const key of item.secondary) load[key] += item.sets.length * 0.5;
+    volume += itemVolume;
+    for (const key of item.primary) {
+      load[key] += item.sets.length;
+      muscleKg[key] += itemVolume;
+    }
+    for (const key of item.secondary) {
+      load[key] += item.sets.length * 0.5;
+      muscleKg[key] += itemVolume * 0.5;
+    }
   }
-  return { sets, reps, volume, load };
+  return { sets, reps, volume, load, muscleKg };
 }
 
 const check = (valid, message) => { if (!valid) throw new Error(message); };
@@ -75,14 +109,17 @@ export const validSet = (kg, reps) => typeof kg === 'number' && Number.isFinite(
   Number.isInteger(reps) && reps >= 1 && reps <= 999;
 
 export function backupOf(state) {
-  return { format: 'podhod-training-diary', version: 1, exportedAt: new Date().toISOString(),
-    exercises: state.exercises, workouts: state.workouts };
+  return { format: 'podhod-training-diary', version: 2, exportedAt: new Date().toISOString(),
+    exercises: state.exercises, workouts: state.workouts, templates: state.templates ?? [], loadUnit: state.loadUnit ?? 'points' };
 }
 
 export function parseBackup(value) {
-  check(value?.format === 'podhod-training-diary' && value.version === 1,
-    'Этот файл не распознан как резервная копия «Подхода» версии 1.');
+  check(value?.format === 'podhod-training-diary' && [1, 2].includes(value.version),
+    'Этот файл не распознан как резервная копия «Подхода».');
   check(Array.isArray(value.exercises) && Array.isArray(value.workouts), 'В файле нет корректных списков упражнений и тренировок.');
+  if (value.version === 2) {
+    check(Array.isArray(value.templates) && ['kg', 'points'].includes(value.loadUnit), 'В копии повреждены программы тренировок или настройки.');
+  }
 
   function exercise(value) {
     check(isID(value?.id) && isName(value.name), 'У упражнения отсутствует название или идентификатор.');
@@ -96,9 +133,9 @@ export function parseBackup(value) {
   }
 
   const exercises = value.exercises.map(exercise);
-  const workouts = value.workouts.map(entry => {
-    check(isID(entry?.id) && isName(entry.name) && isDate(entry.date) && Array.isArray(entry.items),
-      'В файле есть тренировка с неверной датой или структурой.');
+  function workout(entry, isTemplate) {
+    check(isID(entry?.id) && isName(entry.name) && Array.isArray(entry.items),
+      'В файле есть тренировка с неверной структурой.');
     const items = entry.items.map(item => {
       const snapshot = exercise(item);
       check(isID(item.exerciseId) && Array.isArray(item.sets), 'В упражнении повреждён список подходов.');
@@ -111,8 +148,19 @@ export function parseBackup(value) {
     });
     check(hasUniqueIDs(items) && new Set(items.map(item => item.exerciseId)).size === items.length,
       'В одной тренировке повторяются упражнения.');
-    return { id: entry.id, name: entry.name.trim(), date: entry.date, items };
-  });
-  check(hasUniqueIDs(exercises) && hasUniqueIDs(workouts), 'В файле повторяются идентификаторы записей.');
-  return { exercises, workouts };
+    const result = { id: entry.id, name: entry.name.trim(), items };
+    if (isTemplate) return result;
+    check(isDate(entry.date), 'В файле есть тренировка с неверной датой.');
+    result.date = entry.date;
+    if (entry.startedAt !== undefined) {
+      const start = new Date(typeof entry.startedAt === 'string' ? entry.startedAt : NaN);
+      check(Number.isFinite(start.getTime()) && start.toISOString() === entry.startedAt, 'В файле неверное время начала тренировки.');
+      result.startedAt = entry.startedAt;
+    }
+    return result;
+  }
+  const workouts = value.workouts.map(entry => workout(entry, false));
+  const templates = value.version === 2 ? value.templates.map(entry => workout(entry, true)) : [];
+  check(hasUniqueIDs(exercises) && hasUniqueIDs(workouts) && hasUniqueIDs(templates), 'В файле повторяются идентификаторы записей.');
+  return { exercises, workouts, templates, ...(value.version === 2 ? { loadUnit: value.loadUnit } : {}) };
 }

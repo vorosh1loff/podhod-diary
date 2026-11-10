@@ -68,7 +68,6 @@ svg { flex: none; vertical-align: middle; }
 .top-inner { min-height: 77px; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 20px; }
 .brand { display: inline-flex; width: fit-content; min-height: 44px; align-items: center; gap: 10px; text-decoration: none; font-size: 1.38rem; font-weight: 820; letter-spacing: -.04em; }
 .brand img { border-radius: 11px; }
-.brand-period { color: var(--accent); }
 #nav { display: flex; align-items: center; gap: 4px; }
 #nav a {
   display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px;
@@ -121,15 +120,13 @@ svg { flex: none; vertical-align: middle; }
 .empty p { font-size: .94rem; }
 .row-icon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; background: var(--nav-selected); color: var(--accent); flex: none; }
 .muted { color: var(--muted); }
-.history-list, .catalog-list, .picker-list, .load-list { margin: 0; padding: 0; list-style: none; }
+.history-list, .catalog-list, .picker-list { margin: 0; padding: 0; list-style: none; }
 .history-list, .catalog-list { border-top: 1px solid var(--line); }
 .history-row, .catalog-row { display: flex; align-items: center; gap: 14px; min-height: 75px; padding: 12px 4px; border-bottom: 1px solid var(--line); }
 .history-row { text-decoration: none; transition: background-color 160ms var(--out); }
 .row-copy { display: grid; gap: 3px; flex: 1; min-width: 0; }
 .row-copy strong, .row-copy span { overflow-wrap: anywhere; }
-.row-copy span, .row-stats small { font-size: .87rem; color: var(--muted); }
-.row-stats { flex: none; text-align: right; font-size: .87rem; }
-.row-stats small { display: block; }
+.row-copy span { font-size: .87rem; color: var(--muted); }
 .row-arrow { color: var(--accent); }
 .row-actions { display: flex; flex: none; }
 
@@ -170,7 +167,30 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
 .calendar-footer .button { padding-inline: 10px; }
 .calendar-agenda { min-width: 0; padding-block: 9px; }
 .calendar-agenda .section-heading { flex-wrap: wrap; }
-.calendar-agenda .row-stats { align-self: center; }
+.calendar-agenda > .button { margin-bottom: 12px; }
+.calendar-record { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--line); }
+.calendar-record .history-row { flex: 1; min-width: 0; border-bottom: 0; }
+.calendar-history { margin-top: 14px; }
+.history-table, .muscle-table { width: 100%; border-collapse: collapse; text-align: left; font-variant-numeric: tabular-nums; }
+.history-table th, .history-table td, .muscle-table th, .muscle-table td { padding: 10px 8px; border-bottom: 1px solid var(--line); }
+.history-table thead th, .muscle-table thead th { color: var(--muted); font-weight: 650; font-size: .84rem; }
+.history-table tbody th { overflow-wrap: anywhere; }
+.history-table td:first-child, .detail-link { white-space: nowrap; }
+.detail-link { display: inline-flex; min-height: 44px; align-items: center; color: var(--accent); }
+.catalog-heading { align-items: center; flex-wrap: wrap; }
+.catalog-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.selection-check { width: 48px; flex: none; }
+.bulk-bar {
+  position: sticky; z-index: 2; bottom: 12px; display: flex; align-items: center;
+  justify-content: space-between; gap: 12px; margin-top: 14px; padding: 10px;
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: 12px;
+}
+.program-options { margin: 14px 0 0; padding: 0; border: 0; min-width: 0; }
+.program-options legend { padding: 0; font-weight: 700; }
+.program-options label { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 3px; border-bottom: 1px solid var(--line); cursor: pointer; overflow-wrap: anywhere; }
+.program-options input { width: 18px; height: 18px; flex: none; accent-color: var(--accent); }
+.repeat-field { margin-bottom: 10px; }
+.button { text-decoration: none; }
 
 .workout-head .page-heading { margin-bottom: 13px; }
 .workout-totals { display: flex; flex-wrap: wrap; gap: 8px 18px; padding-bottom: 16px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: .9rem; font-variant-numeric: tabular-nums; }
@@ -188,11 +208,23 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
 .empty-workout { margin-bottom: 12px; }
 .add-exercise { margin-top: 10px; }
 .load-panel { background: var(--panel); color: var(--panel-ink); border-radius: var(--radius); padding: 22px; }
-.load-panel .section-heading span, .load-empty, .method p { color: var(--panel-muted); }
-.load-list { display: grid; gap: 13px 32px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-block: 18px; }
-.load-label { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 4px; font-size: .91rem; }
-.load-label strong { color: var(--accent); font-variant-numeric: tabular-nums; }
+.load-heading { align-items: center; flex-wrap: wrap; }
+.method p, .week-dates { color: var(--panel-muted); }
+.unit-picker { display: inline-flex; gap: 2px; background: var(--paper); padding: 2px; border-radius: 12px; }
+.unit-picker .button { min-height: 44px; padding-inline: 13px; color: var(--muted); }
+.unit-picker .button[aria-pressed="true"] { color: var(--accent-hover); background: var(--nav-selected); }
+.muscle-map { display: flex; justify-content: center; gap: 22px; padding: 16px 0; }
+.muscle-map div { width: min(34%, 120px); text-align: center; }
+.muscle-map svg { display: block; width: 100%; height: auto; }
+.muscle-map span { color: var(--muted); font-size: .83rem; }
+.muscle-outline { fill: var(--surface-hover); stroke: var(--line-strong); stroke-width: 1.1; }
+.muscle-zone { fill: var(--paper); stroke: var(--panel); stroke-width: .9; }
+.muscle-zone.loaded { fill: var(--accent); fill-opacity: var(--heat); }
+.muscle-table tbody th { font-weight: 550; }
+.muscle-table th:last-child, .muscle-table td { text-align: right; }
+.muscle-table td { color: var(--accent); overflow-wrap: anywhere; }
 .load-track { height: 6px; border-radius: 6px; overflow: clip; background: var(--plate-ink); }
+.muscle-table .load-track { height: 3px; margin-top: 5px; }
 .load-track span { display: block; width: 100%; height: 100%; transform: scaleX(var(--fraction)); transform-origin: left; border-radius: inherit; background: var(--accent); }
 .method { margin-top: 14px; border-top: 1px solid var(--plate-guides); }
 .method summary { cursor: pointer; min-height: 44px; padding-top: 12px; font-weight: 680; color: var(--accent); }
@@ -267,9 +299,11 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
     min-height: var(--nav-offset); padding: 6px max(10px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
     background: var(--surface); border-top: 1px solid var(--line); gap: 4px;
   }
-  #nav a { flex: 1 1 0; flex-direction: column; padding: 5px; min-height: 50px; gap: 3px; font-size: .72rem; }
+  #nav a { flex: 1 1 0; min-width: 0; flex-direction: column; padding: 3px; min-height: 50px; gap: 3px; font-size: .7rem; line-height: 1.1; text-align: center; }
+  #nav a[href="#exercises"] { flex-grow: 1.35; }
   .main { padding-top: 17px; padding-bottom: calc(var(--nav-offset) + 24px); }
   .notice { bottom: calc(var(--nav-offset) + 8px); }
+  .bulk-bar { bottom: calc(var(--nav-offset) + 8px); }
   .intro { min-height: 310px; padding: 25px; }
   .intro h1 { font-size: 3rem; }
   .dumbbell-art { right: -5%; top: 45%; opacity: .75; }
@@ -283,7 +317,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
   .intro { min-height: 345px; padding: 24px 19px; align-items: start; }
   .intro h1 { font-size: 2.36rem; }
   .intro p { max-width: 27ch; margin: 11px 0 16px; font-size: .94rem; }
-  .dumbbell-art { width: 246px; min-width: 0; right: -5px; top: auto; bottom: -8px; transform: none; opacity: 1; }
+  .dumbbell-art { width: 246px; min-width: 0; right: -5px; top: auto; bottom: -18px; transform: none; opacity: 1; }
   .totals { padding-block: 13px; margin-top: 13px; }
   .metric { padding-inline: 9px; }
   .metric-label { font-size: .73rem; gap: 4px; }
@@ -296,12 +330,9 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
   .row-icon { width: 40px; height: 40px; }
   .history-row, .catalog-row { padding-inline: 0; gap: 9px; }
   .catalog-row .row-icon { display: none; }
-  .row-stats { font-size: .77rem; }
-  .row-stats small { font-size: .77rem; }
   .row-arrow { display: none; }
   .exercise-entry { padding-inline: 10px; }
   .load-panel { padding: 16px; }
-  .load-list { grid-template-columns: minmax(0, 1fr); }
   .calendar-panel { padding: 12px; }
   .data-row { gap: 12px; }
   .sheet, .sheet.wide {
@@ -320,7 +351,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
 @media (max-width: 370px) {
   .intro h1 { font-size: 1.95rem; }
   .intro { min-height: 319px; }
-  .dumbbell-art { width: 208px; right: -12px; bottom: -15px; }
+  .dumbbell-art { width: 208px; right: -12px; bottom: -20px; }
   .load-panel .section-heading { flex-wrap: wrap; }
   .calendar-panel { padding: 9px; }
   .calendar-week, .calendar-days { gap: 3px; }
