@@ -1,5 +1,5 @@
 import { MUSCLES, number, plural, formatDate, formatStart, shortDate, workoutStats, currentWeek, today,
-  INBODY_MAIN, INBODY_EXTRA, INBODY_SEGMENTS, INBODY_SEGMENT_FIELDS, INBODY_METRICS } from './model.js';
+  INBODY_MAIN, INBODY_EXTRA, INBODY_SEGMENTS, INBODY_SEGMENT_FIELDS, INBODY_METRICS, DEFAULT_INBODY_METRIC } from './model.js';
 import { icon, muscleArt } from './graphics.js';
 
 export const esc = value => String(value).replace(/[&<>"']/g, character => ({
@@ -48,7 +48,7 @@ function calendarRows(workouts, date) {
   </li>`).join('')}</ul>`;
 }
 
-export function journal(state, metricKey) {
+export function journal(state) {
   let sets = 0;
   let volume = 0;
   for (const workout of state.workouts) {
@@ -78,7 +78,7 @@ export function journal(state, metricKey) {
     </section>
     ${nextTrainingView(state, currentDate)}
     ${loadView(week, state.loadUnit, week)}
-    ${inbodySummary(state.measurements ?? [], metricKey)}`;
+    ${inbodySummary(state.measurements ?? [], state.inbodyMetric)}`;
 }
 
 function nextTrainingView({ templates = [], nextTraining }, currentDate) {
@@ -296,11 +296,11 @@ function loadView(stats, unit, week) {
 export function dataView(state, standalone) {
   return `<div class="page-heading"><div><h1>Резервные копии</h1><p>Дневник хранится на этом устройстве. JSON-файл позволяет перенести его или восстановить после очистки данных.</p></div></div>
     <div class="data-list">
-      <section class="data-row"><div class="row-icon">${icon('download')}</div><div><h2>Сохранить копию</h2>
-      <p>${countWorkouts(state.workouts.length)} и ${countExercises(state.exercises.length)}. Шаблоны тренировок тоже входят в копию.</p>
+      <section class="data-row"><div class="row-icon">${icon('download')}</div><div><h2>Сохранить полную копию</h2>
+      <p>В JSON входят тренировки и шаблоны, упражнения в сохранённом порядке, заметки, подходы, план следующей тренировки, замеры InBody и настройки отображения.</p>
       ${action('export', 'Скачать JSON', 'download', 'primary')}</div></section>
       <section class="data-row"><div class="row-icon">${icon('upload')}</div><div><h2>Восстановить дневник</h2>
-      <p>Выбранная копия заменит текущий дневник после вашего подтверждения.</p>
+      <p>На новом телефоне откройте дневник, выберите здесь сохранённый JSON и подтвердите восстановление. Полная копия заменит данные и настройки дневника на этом устройстве.</p>
       ${action('select-backup', 'Выбрать JSON', 'upload')}
       <input id="backup-file" type="file" accept=".json,application/json" hidden></div></section>
       ${standalone ? '' : `<section class="data-row"><div class="row-icon">${icon('info')}</div><div><h2>Установка на iPhone</h2>
@@ -384,7 +384,7 @@ function readingDelta(current, base, unit) {
   return `${change > 0 ? '+' : ''}${displayReading(change, unit === '%' ? 'п. п.' : unit)}`;
 }
 
-function inbodySummary(entries, metricKey = 'weight') {
+function inbodySummary(entries, metricKey = DEFAULT_INBODY_METRIC) {
   const sorted = orderMeasurements(entries);
   const latest = sorted.at(-1);
   const previous = sorted.at(-2);

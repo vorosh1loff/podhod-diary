@@ -1,6 +1,6 @@
 import { openStorage, readState, changeState } from './storage.js';
 import { today, isDate, validSet, parseBackup, backupOf, plural, formatDate, shortDate, NOTE_LIMIT, validNote,
-  INBODY_FIELDS, INBODY_METRICS, parseMeasurement, parseMeasurements } from './model.js';
+  DEFAULT_INBODY_METRIC, INBODY_FIELDS, INBODY_METRICS, parseMeasurement, parseMeasurements } from './model.js';
 import { icon } from './graphics.js';
 import { enableExerciseReorder } from './exercise-reorder.js';
 import { esc, navigation, journal, calendar, historyView, catalog, workoutView, workoutBackLink, dataView, muscleFields, action,
@@ -22,7 +22,6 @@ let submitDialog;
 let search = '';
 let selectedExercises = null;
 let displayedDay;
-let inbodyMetric = 'weight';
 const cancelExerciseReorder = enableExerciseReorder(main, dropExercise);
 
 function getRoute() {
@@ -91,7 +90,7 @@ function render({ navigate = false } = {}) {
       break;
     }
     default:
-      main.innerHTML = journal(state, inbodyMetric);
+      main.innerHTML = journal(state);
   }
   if (navigate) {
     window.scrollTo(0, 0);
@@ -525,15 +524,20 @@ async function importBackup(file, trigger) {
   }
 
   if (getRoute().page !== 'data' || dialog.open) return;
+  const fullCopy = backup.inbodyMetric !== undefined;
   openDialog({
     title: 'Заменить текущий дневник?',
-    content: `<p class="form-context">В копии ${plural(backup.workouts.length, 'тренировка', 'тренировки', 'тренировок')} и ${plural(backup.exercises.length, 'упражнение', 'упражнения', 'упражнений')}. Шаблонов тренировок: ${backup.templates.length}. Восстановление заменит упражнения, шаблоны, историю тренировок и план следующей тренировки на этом устройстве. ${backup.measurements ? `История InBody тоже будет заменена. Замеров в копии: ${backup.measurements.length}.` : 'Текущая история InBody сохранится.'}</p>`,
+    content: `<p class="form-context">В копии ${plural(backup.workouts.length, 'тренировка', 'тренировки', 'тренировок')} и ${plural(backup.exercises.length, 'упражнение', 'упражнения', 'упражнений')}. Шаблонов тренировок — ${backup.templates.length}.${backup.measurements ? ` Замеров InBody — ${backup.measurements.length}.` : ''}</p>
+      <p class="form-context restore-summary">${fullCopy
+        ? 'Полная копия заменит текущие данные и настройки дневника.'
+        : `Копия заменит каталог, шаблоны, историю тренировок и план следующей тренировки. ${backup.measurements ? 'Замеры InBody тоже будут заменены.' : 'Текущие замеры InBody сохранятся.'}`}</p>`,
     label: 'Восстановить', danger: true, trigger,
     submit: async () => {
       await save(next => {
         if (next.revision !== revision) throw new Error('Дневник изменился после выбора файла. Закройте окно и выберите файл снова.');
         Object.assign(next, backup);
       });
+      search = '';
       return { message: 'Дневник восстановлен' };
     },
   });
@@ -584,15 +588,25 @@ document.addEventListener('input', event => {
   }
 });
 
-document.addEventListener('change', event => {
+document.addEventListener('change', async event => {
   const input = event.target;
   if (input.id === 'next-training-template' || input.id === 'next-training-date') {
     void updateNextTraining(input.id === 'next-training-template' ? 'templateId' : 'date', input.value);
     return;
   }
   if (input.id === 'inbody-metric' && Object.hasOwn(INBODY_METRICS, input.value)) {
-    inbodyMetric = input.value;
-    main.querySelector('#inbody-chart').innerHTML = inbodyChart(state.measurements ?? [], inbodyMetric);
+    const metric = input.value;
+    const chart = main.querySelector('#inbody-chart');
+    chart.innerHTML = inbodyChart(state.measurements ?? [], metric);
+    try {
+      await save(next => { next.inbodyMetric = metric; });
+    } catch {
+      if (input.isConnected && input.value === metric) {
+        input.value = state.inbodyMetric ?? DEFAULT_INBODY_METRIC;
+        chart.innerHTML = inbodyChart(state.measurements ?? [], input.value);
+      }
+      showNotice('Не удалось сохранить показатель InBody.');
+    }
     return;
   }
   if (input.name === 'selected-exercise' && selectedExercises) {

@@ -19,12 +19,16 @@ const starters = [
   ['Подъёмы на носки', ['calves'], []],
 ];
 
+export const DEFAULT_INBODY_METRIC = 'weight';
+
 export const initialState = () => ({
   exercises: starters.map(([name, primary, secondary], index) => ({ id: `base-${index + 1}`, name, primary, secondary })),
   workouts: [],
   templates: [],
   measurements: [],
   loadUnit: 'points',
+  inbodyMetric: DEFAULT_INBODY_METRIC,
+  nextTraining: null,
   revision: 0,
 });
 
@@ -166,18 +170,22 @@ export const validSet = (kg, reps) => typeof kg === 'number' && Number.isFinite(
   Number.isInteger(reps) && reps >= 1 && reps <= 999;
 
 export function backupOf(state) {
-  return { format: 'podhod-training-diary', version: 3, exportedAt: new Date().toISOString(),
+  return { format: 'podhod-training-diary', version: 4, exportedAt: new Date().toISOString(),
     exercises: state.exercises, workouts: state.workouts, templates: state.templates ?? [],
     loadUnit: state.loadUnit ?? 'points', measurements: state.measurements ?? [],
-    nextTraining: state.nextTraining ?? null };
+    inbodyMetric: state.inbodyMetric ?? DEFAULT_INBODY_METRIC, nextTraining: state.nextTraining ?? null };
 }
 
 export function parseBackup(value) {
-  check(value?.format === 'podhod-training-diary' && [1, 2, 3].includes(value.version),
+  check(value?.format === 'podhod-training-diary' && [1, 2, 3, 4].includes(value.version),
     'Этот файл не распознан как резервная копия «Подхода».');
   check(Array.isArray(value.exercises) && Array.isArray(value.workouts), 'В файле нет корректных списков упражнений и тренировок.');
   if (value.version >= 2) {
     check(Array.isArray(value.templates) && ['kg', 'points'].includes(value.loadUnit), 'В копии повреждены программы тренировок или настройки.');
+  }
+  if (value.version === 4) {
+    check(typeof value.inbodyMetric === 'string' && Object.hasOwn(INBODY_METRICS, value.inbodyMetric) &&
+      Object.hasOwn(value, 'nextTraining'), 'В полной копии отсутствует или повреждена часть настроек и данных.');
   }
 
   function exercise(value) {
@@ -188,7 +196,7 @@ export function parseBackup(value) {
     'Проверьте основные и вспомогательные группы мышц в файле.');
     check(note === undefined || validNote(note), `Заметка к упражнению должна быть текстом до ${NOTE_LIMIT} символов.`);
     return { id, name: name.trim(), primary: [...primary], secondary: [...secondary],
-      ...(note?.trim() ? { note: note.trim() } : {}) };
+      ...(note === undefined ? {} : { note: note.trim() }) };
   }
 
   const exercises = value.exercises.map(exercise);
@@ -229,5 +237,6 @@ export function parseBackup(value) {
     if (templateId || date) nextTraining = { templateId, date };
   }
   return { exercises, workouts, templates, nextTraining, ...(value.version >= 2 ? { loadUnit: value.loadUnit } : {}),
-    ...(value.version === 3 ? { measurements: parseMeasurements(value.measurements) } : {}) };
+    ...(value.version >= 3 ? { measurements: parseMeasurements(value.measurements) } : {}),
+    ...(value.version === 4 ? { inbodyMetric: value.inbodyMetric } : {}) };
 }
