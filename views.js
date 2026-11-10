@@ -172,11 +172,12 @@ function metric(label, value) {
 
 export function catalog(state, selection) {
   const sorted = [...state.exercises].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  const templates = state.templates ?? [];
   return `<div class="page-heading"><div><h1>Тренировки и упражнения</h1><p>Соберите тренировку и выберите её в календаре, когда начнёте.</p></div></div>
     <section aria-labelledby="programs-title">
-      <div class="section-heading catalog-heading"><h2 id="programs-title">Мои тренировки</h2>
+      <div class="section-heading catalog-heading"><h2 id="programs-title">Мои тренировки <span class="catalog-count">${number(templates.length)}</span></h2>
         ${action('new-template', 'Новая тренировка', 'plus', 'primary')}</div>
-      ${state.templates?.length ? `<ul class="history-list">${state.templates.map(template => `<li>
+      ${templates.length ? `<ul class="history-list">${templates.map(template => `<li>
         <a class="history-row" href="#template/${template.id}">
           <span class="row-icon">${icon('weights', 21)}</span>
           <span class="row-copy"><strong>${esc(template.name)}</strong><span>${countExercises(template.items.length)}</span></span>
@@ -184,7 +185,7 @@ export function catalog(state, selection) {
         </a></li>`).join('')}</ul>` : '<p class="muted">Здесь будут тренировки, которые можно повторять.</p>'}
     </section>
     <section class="section" aria-labelledby="exercise-catalog-title">
-    <div class="section-heading catalog-heading"><h2 id="exercise-catalog-title">Упражнения</h2>
+    <div class="section-heading catalog-heading"><h2 id="exercise-catalog-title">Мои упражнения <span class="catalog-count">${number(sorted.length)}</span></h2>
       <div class="catalog-actions">
         ${sorted.length || selection ? action('select-exercises', selection ? 'Отмена' : 'Выбрать', null) : ''}
         ${selection ? '' : action('new-exercise', 'Новое упражнение', 'plus', 'secondary')}
@@ -231,12 +232,12 @@ export function workoutView(workout, { date, history = false, template = false, 
       ${template ? '' : '<p class="muted session-edit-hint">Замены сохраняются только в этой записи тренировки.</p>'}
       ${canReorder ? '<p class="muted exercise-order-hint">Тяните за номер или нажмите, чтобы выбрать позицию.</p>' : ''}
       <div class="workout-items">
-        ${workout.items.map((item, index) => `<article class="exercise-entry" data-exercise-id="${item.id}">
+        ${workout.items.map((item, index) => `<article class="exercise-entry" data-exercise-id="${item.id}" tabindex="-1" aria-labelledby="exercise-title-${item.id}">
           <div class="entry-head">
             ${canReorder ? `<button type="button" class="exercise-grip" data-action="move-item" data-id="${item.id}"
               aria-label="Переместить «${esc(item.name)}», позиция ${index + 1}">${icon('grip', 14)}<span class="exercise-number">${index + 1}</span></button>` :
               `<span class="exercise-grip"><span class="sr-only">Позиция </span><span class="exercise-number">${index + 1}</span></span>`}
-            <div class="row-copy"><h3>${esc(item.name)}</h3>
+            <div class="row-copy"><h3 id="exercise-title-${item.id}">${esc(item.name)}</h3>
               ${item.note ? `<p class="exercise-note">${esc(item.note)}</p>` : ''}
               <span>${muscleNames(item.primary)}</span>
             </div>

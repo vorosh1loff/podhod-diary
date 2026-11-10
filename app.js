@@ -14,6 +14,7 @@ const notice = document.querySelector('#notice');
 const status = document.querySelector('#offline-status');
 document.documentElement.classList.add('js');
 const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('podhod-training-diary') : null;
 let state;
 let pending = false;
@@ -34,8 +35,7 @@ function updateScrollTopButton() {
 scrollTopButton.innerHTML = icon('arrow', 22);
 scrollTopButton.addEventListener('click', () => {
   main.focus({ preventScroll: true });
-  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  window.scrollTo({ top: 0, behavior: reducedMotion.matches ? 'auto' : 'smooth' });
 });
 window.addEventListener('scroll', updateScrollTopButton, { passive: true });
 window.addEventListener('resize', updateScrollTopButton);
@@ -206,6 +206,22 @@ function failForm(error) {
   node.scrollIntoView({ block: 'nearest' });
 }
 
+function finishDialog({ route, addedItemId, message } = {}) {
+  if (addedItemId) dialogTrigger = null;
+  dialog.close();
+  if (route) {
+    location.hash = route;
+  } else {
+    render();
+    const added = addedItemId && main.querySelector(`[data-exercise-id="${addedItemId}"]`);
+    if (added) {
+      added.focus({ preventScroll: true });
+      added.scrollIntoView({ block: 'start', behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+    }
+  }
+  if (message) showNotice(message);
+}
+
 dialog.addEventListener('close', () => {
   if (!dialog.open) {
     restoreFocus(dialogTrigger);
@@ -230,11 +246,7 @@ dialog.addEventListener('submit', async event => {
   buttons.forEach(button => { button.disabled = true; });
   dialog.querySelector('#form-error').hidden = true;
   try {
-    const result = await submitDialog(data);
-    dialog.close();
-    if (result?.route) location.hash = result.route;
-    else render();
-    if (result?.message) showNotice(result.message);
+    finishDialog(await submitDialog(data));
   } catch (error) {
     failForm(error);
   } finally {
@@ -271,6 +283,7 @@ function editWorkout(workout, template) {
 }
 
 function startWorkout(date) {
+  const calendarHash = location.hash;
   const templates = state.templates ?? [];
   if (!templates.length) {
     openDialog({
@@ -295,14 +308,15 @@ function startWorkout(date) {
         next.workouts.unshift({ id, name: template.name, items: structuredClone(template.items), date, startedAt });
         if (next.nextTraining?.templateId === template.id && next.nextTraining.date === date) next.nextTraining = null;
       });
-      return { route: `workout/${id}/${date}`, message: 'Тренировка добавлена в календарь' };
+      if (location.hash === calendarHash) history.replaceState(null, '', `#calendar/${date}`);
+      return { message: 'Тренировка добавлена в календарь' };
     },
   });
 }
 
-function attachExercise(workout, exercise) {
+function attachExercise(workout, exercise, itemId) {
   if (workout.items.some(item => item.exerciseId === exercise.id)) throw new Error('Это упражнение уже есть в тренировке.');
-  workout.items.push({ ...exercise, exerciseId: exercise.id, id: crypto.randomUUID(), sets: [] });
+  workout.items.push({ ...exercise, exerciseId: exercise.id, id: itemId, sets: [] });
 }
 
 function moveExercise(next, workoutId, template, itemId, anchorId, after) {
@@ -370,6 +384,7 @@ function editExercise(exercise, workout, item, template = false) {
       const secondary = data.getAll('secondary');
       if (!primary.length) throw new Error('Отметьте хотя бы одну основную группу мышц.');
       const updated = { id: entry?.id || crypto.randomUUID(), name, primary, secondary, note };
+      const addedItemId = workout && !item ? crypto.randomUUID() : undefined;
       await save(next => {
         if (item) {
           const target = findEntry(trainingList(next, template), workout.id, 'Тренировка');
@@ -378,9 +393,9 @@ function editExercise(exercise, workout, item, template = false) {
         }
         if (exercise) Object.assign(findEntry(next.exercises, exercise.id, 'Упражнение'), updated);
         else next.exercises.push(updated);
-        if (workout) attachExercise(findEntry(trainingList(next, template), workout.id, 'Тренировка'), updated);
+        if (addedItemId) attachExercise(findEntry(trainingList(next, template), workout.id, 'Тренировка'), updated, addedItemId);
       });
-      return { message: item ? 'Упражнение обновлено' : workout ? 'Упражнение добавлено' : 'Каталог обновлён' };
+      return { addedItemId, message: item ? 'Упражнение обновлено' : workout ? 'Упражнение добавлено' : 'Каталог обновлён' };
     },
   });
 }
@@ -409,7 +424,7 @@ function editSet(workout, item, set, template) {
         <label class="field">Вес, кг<input name="kg" type="text" inputmode="decimal" required maxlength="7" autocomplete="off" value="${set ? set.kg : previous?.kg ?? ''}" placeholder="0"></label>
         <label class="field">Повторы<input name="reps" type="text" inputmode="numeric" required maxlength="3" autocomplete="off" value="${set ? set.reps : previous?.reps ?? ''}" placeholder="12"></label>
       </div>
-      ${template && !set ? '<label class="field repeat-field">Количество подходов<input name="count" type="number" min="1" max="99" step="1" inputmode="numeric" value="1" required></label>' : ''}
+      ${!set ? '<label class="field repeat-field">Количество подходов<input name="count" type="number" min="1" max="99" step="1" inputmode="numeric" value="1" required></label>' : ''}
       <p class="form-hint">Для упражнения без дополнительного веса укажите 0 кг.</p>`,
     label: set ? 'Сохранить' : 'Записать подход',
     submit: async data => {
@@ -427,7 +442,7 @@ function editSet(workout, item, set, template) {
         if (set) Object.assign(findEntry(target.sets, set.id, 'Подход'), { kg, reps });
         else target.sets.push(...Array.from({ length: count }, () => ({ id: crypto.randomUUID(), kg, reps })));
       });
-      return { message: 'Подход сохранён' };
+      return { message: count === 1 ? 'Подход сохранён' : `Сохранено ${plural(count, 'подход', 'подхода', 'подходов')}` };
     },
   });
 }
@@ -737,16 +752,15 @@ document.addEventListener('click', async event => {
     case 'move-item': if (item) chooseExercisePosition(workout, item, template, button); break;
     case 'new-and-attach': if (workout) editExercise(null, workout, null, template); break;
     case 'edit-item': if (item) editExercise(null, workout, item, template); break;
-    case 'attach':
+    case 'attach': {
       if (!workout) break;
+      const addedItemId = crypto.randomUUID();
       pending = true;
       dialog.querySelectorAll('button').forEach(control => { control.disabled = true; });
       try {
         await save(next => attachExercise(findEntry(trainingList(next, template), workout.id, 'Тренировка'),
-          findEntry(next.exercises, id, 'Упражнение')));
-        dialog.close();
-        render();
-        showNotice('Упражнение добавлено');
+          findEntry(next.exercises, id, 'Упражнение'), addedItemId));
+        finishDialog({ addedItemId, message: 'Упражнение добавлено' });
       } catch (error) {
         failForm(error);
       } finally {
@@ -754,6 +768,7 @@ document.addEventListener('click', async event => {
         dialog.querySelectorAll('button').forEach(control => { control.disabled = false; });
       }
       break;
+    }
     case 'delete-item':
       if (item) confirmRemove('Убрать упражнение?', `«${esc(item.name)}» и его подходы будут удалены из этой тренировки.`,
         next => removeEntry(findEntry(trainingList(next, template), workout.id, 'Тренировка').items, id));
