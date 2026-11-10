@@ -24,12 +24,26 @@ export function icon(name, size = 22) {
   return `<svg aria-hidden="true" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths[name]}</svg>`;
 }
 
-const hexHead = `<path d="M-59-58H-14L10-17-6 39-52 57-82 17Z" class="dumbbell-edge"/>
-  <path d="M-59-58h38l-23 75h-38Z" class="dumbbell-side"/>
-  <path d="M-82 17h38l30 40h-38Z" class="dumbbell-edge"/>
-  <path d="M-21-58H24L48-17 32 39-14 57-44 17Z" class="dumbbell-face"/>
-  <path d="M-15-49h34L38-15 25 31-10 46-34 15Z" class="dumbbell-rim"/>
-  <path d="M-11-43h26" class="dumbbell-highlight"/>`;
+const AXIS_Y = 136;
+const DISC_THICKNESS = 20;
+
+// Every round plate uses the same projection and sits on the same axle.
+function roundDisc(front, radius) {
+  const back = front - DISC_THICKNESS;
+  const oval = radius * 0.42;
+  const top = AXIS_Y - radius;
+  const bottom = AXIS_Y + radius;
+  return `<g class="dumbbell-disc">
+    <path d="M${front} ${top}H${back}A${oval} ${radius} 0 0 0 ${back} ${bottom}H${front}Z" class="dumbbell-side"/>
+    <path d="M${back + 2} ${top + 3}h${DISC_THICKNESS - 2}" class="dumbbell-highlight"/>
+    <ellipse cx="${front}" cy="${AXIS_Y}" rx="${oval}" ry="${radius}" class="dumbbell-face"/>
+    <ellipse cx="${front}" cy="${AXIS_Y}" rx="${oval - 3}" ry="${radius - 7}" class="dumbbell-rim"/>
+  </g>`;
+}
+
+const discRadii = [34, 47, 60];
+const leftStack = discRadii.map((radius, index) => roundDisc(105 + index * DISC_THICKNESS, radius)).join('');
+const rightStack = [...discRadii].reverse().map((radius, index) => roundDisc(305 + index * DISC_THICKNESS, radius)).join('');
 
 export const dumbbellArt = `<svg class="dumbbell-art" viewBox="0 0 440 270" fill="none" aria-hidden="true">
   <defs>
@@ -41,12 +55,13 @@ export const dumbbellArt = `<svg class="dumbbell-art" viewBox="0 0 440 270" fill
     <path d="M28 230h393M340 19v218M112 38h302M46 224 422 52M71 69h32m-16-16v32m287 120h34m-17-17v34"/>
     <path d="M144 236v12m10-12v6m10-6v6m10-6v6m10-6v12m10-12v6m10-6v6m10-6v6m10-6v12m10-12v6m10-6v6m10-6v6m10-6v12"/>
   </g>
-  <g transform="rotate(-22 253 138)" stroke-linejoin="round">
-    <g transform="translate(148 136) scale(.91)">${hexHead}</g>
-    <rect x="151" y="123" width="181" height="27" rx="13.5" class="dumbbell-bar"/>
-    <rect x="205" y="123" width="84" height="27" rx="5" class="dumbbell-grip"/>
-    <rect x="210" y="126" width="74" height="21" rx="3" fill="url(#grip-texture)"/>
-    <path d="M200 128v17m94-17v17" class="dumbbell-collars"/>
-    <g transform="translate(355 136)">${hexHead}</g>
+  <g transform="rotate(-22 225 136)" stroke-linejoin="round">
+    ${leftStack}
+    <rect x="144" y="124" width="162" height="24" rx="9" class="dumbbell-bar"/>
+    <rect x="181" y="123" width="91" height="26" rx="5" class="dumbbell-grip"/>
+    <rect x="186" y="126" width="81" height="20" rx="3" fill="url(#grip-texture)"/>
+    <path d="M176 128v16m101-16v16" class="dumbbell-collars"/>
+    ${rightStack}
+    <ellipse cx="345" cy="${AXIS_Y}" rx="4.5" ry="11" class="dumbbell-grip"/>
   </g>
 </svg>`;

@@ -88,7 +88,6 @@ svg { flex: none; vertical-align: middle; }
 .intro .primary:focus-visible { outline-color: var(--accent); }
 .dumbbell-art { position: absolute; z-index: -1; width: 52%; min-width: 330px; max-width: 530px; height: auto; right: 3%; top: 50%; transform: translateY(-50%); pointer-events: none; }
 .dumbbell-guides { stroke: var(--plate-guides); stroke-width: 1; opacity: .6; }
-.dumbbell-edge { fill: var(--plate-edge); stroke: var(--plate-ink); stroke-width: 2; }
 .dumbbell-side { fill: var(--plate-mid); stroke: var(--plate-ink); stroke-width: 2; }
 .dumbbell-face { fill: var(--accent); stroke: var(--plate-ink); stroke-width: 2.5; }
 .dumbbell-rim { stroke: var(--plate-seam); stroke-width: 1.5; }
@@ -321,7 +320,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
 @media (max-width: 370px) {
   .intro h1 { font-size: 1.95rem; }
   .intro { min-height: 319px; }
-  .dumbbell-art { width: 208px; right: -12px; }
+  .dumbbell-art { width: 208px; right: -12px; bottom: -15px; }
   .load-panel .section-heading { flex-wrap: wrap; }
   .calendar-panel { padding: 9px; }
   .calendar-week, .calendar-days { gap: 3px; }
