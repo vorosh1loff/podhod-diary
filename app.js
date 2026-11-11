@@ -374,10 +374,12 @@ function chooseExercisePosition(workout, item, template, trigger) {
 
 function editExercise(exercise, workout, item, template = false) {
   const entry = item || exercise;
+  const hint = item ? 'Изменения применятся к этой тренировке.' :
+    exercise ? 'Название и группы мышц обновятся во всех шаблонах с этим упражнением. В шаблонах с отдельной заметкой сохранится её текст.' : '';
   openDialog({
     title: item ? 'Упражнение в тренировке' : exercise ? 'Редактировать упражнение' : 'Новое упражнение',
     wide: true,
-    content: `${item ? '<p class="form-hint snapshot-hint">Изменения применятся к этой тренировке.</p>' : ''}
+    content: `${hint ? `<p class="form-hint snapshot-hint">${hint}</p>` : ''}
       <label class="field">Название<input name="name" required maxlength="80" autocomplete="off" value="${esc(entry?.name || '')}" placeholder="Например, Тяга гантели"></label>
       <label class="field">Заметка (необязательно)<textarea name="note" maxlength="${NOTE_LIMIT}" rows="2" placeholder="Например, сиденье на 3, спинка на 5">${esc(entry?.note || '')}</textarea></label>
       ${muscleFields(entry)}`,
@@ -397,8 +399,17 @@ function editExercise(exercise, workout, item, template = false) {
           Object.assign(findEntry(target.items, item.id, 'Упражнение'), updated);
           return;
         }
-        if (exercise) Object.assign(findEntry(next.exercises, exercise.id, 'Упражнение'), updated);
-        else next.exercises.push(updated);
+        if (exercise) {
+          const catalogExercise = findEntry(next.exercises, exercise.id, 'Упражнение');
+          for (const program of next.templates ?? []) {
+            for (const entry of program.items) {
+              if (entry.exerciseId !== catalogExercise.id) continue;
+              Object.assign(entry, { name, primary, secondary });
+              if ((entry.note ?? '') === (catalogExercise.note ?? '')) entry.note = note;
+            }
+          }
+          Object.assign(catalogExercise, updated);
+        } else next.exercises.push(updated);
         if (addedItemId) placeExercise(findEntry(trainingList(next, template), workout.id, 'Тренировка'), updated, addedItemId);
       });
       return { addedItemId, message: item ? 'Упражнение обновлено' : workout ? 'Упражнение добавлено' : 'Каталог обновлён' };
