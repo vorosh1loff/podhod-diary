@@ -48,7 +48,7 @@ function calendarRows(workouts, date) {
   </li>`).join('')}</ul>`;
 }
 
-export function journal(state, selectedLoadDate) {
+export function journal(state, selectedLoadDate, loadWeekOffset = 0) {
   let sets = 0;
   let volume = 0;
   for (const workout of state.workouts) {
@@ -58,6 +58,9 @@ export function journal(state, selectedLoadDate) {
   }
   const currentDate = today();
   const week = currentWeek(state.workouts, currentDate);
+  const loadDate = new Date(currentDate);
+  loadDate.setUTCDate(loadDate.getUTCDate() + loadWeekOffset * 7);
+  const loadWeek = loadWeekOffset ? currentWeek(state.workouts, loadDate.toISOString().slice(0, 10)) : week;
   const count = week.days.reduce((sum, day) => sum + day.count, 0);
   return `
     <h1 class="sr-only">Дневник</h1>
@@ -77,7 +80,7 @@ export function journal(state, selectedLoadDate) {
       </ul>
     </section>
     ${nextTrainingView(state, currentDate)}
-    ${weeklyLoadView(week, state.loadUnit, selectedLoadDate)}
+    ${weeklyLoadView(loadWeek, state.loadUnit, selectedLoadDate, loadWeekOffset === 0)}
     ${inbodySummary(state.measurements ?? [], state.inbodyMetric)}`;
 }
 
@@ -282,7 +285,7 @@ function unitPicker(kg) {
   </div>`;
 }
 
-function weeklyLoadView(week, unit, selectedDate) {
+function weeklyLoadView(week, unit, selectedDate, isCurrentWeek) {
   const kg = unit === 'kg';
   const field = kg ? 'muscleKg' : 'load';
   const values = week.days.map(day => Object.values(day[field]).reduce((sum, value) => sum + value, 0));
@@ -290,7 +293,11 @@ function weeklyLoadView(week, unit, selectedDate) {
   const selected = week.days.find(day => day.date === selectedDate);
   return `<section class="load-panel section" aria-labelledby="weekly-load-title">
     <div class="section-heading load-heading"><h2 id="weekly-load-title">Нагрузка за неделю</h2>${unitPicker(kg)}</div>
-    <p class="week-dates">${shortDate(week.start)} — ${shortDate(week.end)}</p>
+    <div class="load-week-nav" role="group" aria-label="Выбор недели">
+      ${iconButton('load-week-prev', 'Предыдущая неделя', 'previous')}
+      <p class="week-dates">${shortDate(week.start)} — ${shortDate(week.end)}</p>
+      ${iconButton('load-week-next', 'Следующая неделя', 'next', isCurrentWeek ? 'disabled' : '')}
+    </div>
     <div class="weekly-bars" role="group" aria-label="Нагрузка по дням недели">
       ${week.days.map((day, index) => `<button type="button" class="weekly-bar" data-action="load-day" data-id="${day.date}"
         aria-controls="daily-load" aria-pressed="${day === selected}"

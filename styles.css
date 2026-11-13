@@ -264,6 +264,12 @@ button.exercise-grip:active { cursor: grabbing; }
 .unit-picker { display: inline-flex; gap: 2px; background: var(--paper); padding: 2px; border-radius: 12px; }
 .unit-picker .button { min-height: 44px; padding-inline: 13px; color: var(--muted); }
 .unit-picker .button[aria-pressed="true"] { color: var(--accent-hover); background: var(--nav-selected); }
+.load-week-nav {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 6px;
+}
+.load-week-nav .week-dates { text-align: center; font-size: .88rem; font-variant-numeric: tabular-nums; }
+.load-week-nav .icon-button { background: var(--surface-hover); color: var(--ink); }
+.load-week-nav .icon-button:disabled { background: transparent; color: var(--line-strong); cursor: default; }
 .weekly-bars {
   display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px;
   margin-block: 14px 18px; padding-bottom: 8px; border-bottom: 1px solid var(--line-strong);
@@ -389,7 +395,7 @@ button.exercise-grip:active { cursor: grabbing; }
 @media (hover: hover) and (pointer: fine) {
   #nav a:hover, .icon-button:hover, .secondary:hover, .text-button:hover, .picker-item:hover, .history-row:hover { background: var(--surface-hover); }
   button.exercise-grip:hover { background: var(--surface-hover); color: var(--ink); }
-  .calendar-top .icon-button:not(:disabled):hover { background: var(--nav-selected); }
+  .calendar-top .icon-button:not(:disabled):hover, .load-week-nav .icon-button:not(:disabled):hover { background: var(--nav-selected); }
   .calendar-day:not([aria-current="date"]):hover { border-color: var(--line-strong); }
   .primary:not(:disabled):hover { background: var(--accent-hover); }
   .danger:not(:disabled):hover { background: var(--danger-hover); }

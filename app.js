@@ -25,6 +25,7 @@ let search = '';
 let selectedExercises = null;
 let displayedDay;
 let selectedLoadDate;
+let loadWeekOffset = 0;
 const cancelExerciseReorder = enableExerciseReorder(main, dropExercise);
 
 function updateScrollTopButton() {
@@ -66,6 +67,10 @@ function removeEntry(items, id) {
 function render({ navigate = false } = {}) {
   if (!state) return;
   cancelExerciseReorder();
+  if (navigate) {
+    loadWeekOffset = 0;
+    selectedLoadDate = undefined;
+  }
   const openSets = new Set(navigate ? [] : [...main.querySelectorAll('.exercise-sets[open]')].map(panel => panel.dataset.itemId));
   const { page, id, fromDate, fromHistory } = getRoute();
   displayedDay = today();
@@ -110,7 +115,7 @@ function render({ navigate = false } = {}) {
       break;
     }
     default:
-      main.innerHTML = journal(state, selectedLoadDate);
+      main.innerHTML = journal(state, selectedLoadDate, loadWeekOffset);
   }
   if (navigate) {
     window.scrollTo(0, 0);
@@ -779,8 +784,17 @@ document.addEventListener('click', async event => {
         next => { next.exercises = next.exercises.filter(exercise => !ids.has(exercise.id)); });
       break;
     }
+    case 'load-week-prev':
+    case 'load-week-next':
+      loadWeekOffset += command === 'load-week-prev' ? -1 : 1;
+      selectedLoadDate = undefined;
+      render();
+      if (loadWeekOffset === 0) {
+        main.querySelector('[data-action="load-week-prev"]').focus({ preventScroll: true });
+      } else restoreFocus(button);
+      break;
     case 'load-day':
-      selectedLoadDate = id;
+      selectedLoadDate = selectedLoadDate === id ? undefined : id;
       render();
       restoreFocus(button);
       break;
