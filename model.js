@@ -113,6 +113,7 @@ const hasUniqueIDs = items => new Set(items.map(item => item.id)).size === items
 
 export const INBODY_MAIN = {
   weight: ['Вес', 'кг'],
+  height: ['Рост', 'см', 300, 1],
   muscle: ['Мышечная масса', 'кг'],
   fat: ['Жировая масса', 'кг'],
   fatPercent: ['Процент жира', '%', 100],
@@ -144,10 +145,10 @@ export function parseMeasurement(entry) {
   const values = {};
   for (const [key, value] of Object.entries(entry.values)) {
     check(Object.hasOwn(INBODY_FIELDS, key), 'В замере есть неизвестный показатель.');
-    const [label, , max = 10000] = INBODY_FIELDS[key];
-    check(typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= max &&
+    const [label, , max = 10000, min = 0] = INBODY_FIELDS[key];
+    check(typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max &&
       Math.abs(value * 100 - Math.round(value * 100)) < 1e-7,
-    `Проверьте показатель «${label}». Допустимы числа от 0 до ${max} с двумя знаками после запятой.`);
+    `Проверьте показатель «${label}». Допустимы числа от ${min} до ${max} с двумя знаками после запятой.`);
     values[key] = value;
   }
   check(Object.keys(values).length > 0, 'Укажите хотя бы один показатель.');

@@ -48,7 +48,7 @@ function calendarRows(workouts, date) {
   </li>`).join('')}</ul>`;
 }
 
-export function journal(state, selectedLoadDate, loadWeekOffset = 0) {
+export function journal(state, selectedLoadDate, loadWeekOffset = 0, inbodyOpen = false) {
   let sets = 0;
   let volume = 0;
   for (const workout of state.workouts) {
@@ -81,7 +81,7 @@ export function journal(state, selectedLoadDate, loadWeekOffset = 0) {
     </section>
     ${nextTrainingView(state, currentDate)}
     ${weeklyLoadView(loadWeek, state.loadUnit, selectedLoadDate, loadWeekOffset === 0)}
-    ${inbodySummary(state.measurements ?? [], state.inbodyMetric)}`;
+    ${inbodySummary(state.measurements ?? [], state.inbodyMetric, inbodyOpen)}`;
 }
 
 function nextTrainingView({ templates = [], nextTraining }, currentDate) {
@@ -442,16 +442,15 @@ function readingDelta(current, base, unit) {
   return `${change > 0 ? '+' : ''}${displayReading(change, unit === '%' ? 'п. п.' : unit)}`;
 }
 
-function inbodySummary(entries, metricKey = DEFAULT_INBODY_METRIC) {
+function inbodySummary(entries, metricKey = DEFAULT_INBODY_METRIC, open = false) {
   const sorted = orderMeasurements(entries);
   const latest = sorted.at(-1);
   const previous = sorted.at(-2);
   const first = sorted.length > 1 ? sorted[0] : undefined;
-  return `<section class="load-panel inbody-panel section" aria-labelledby="inbody-title">
-    <div class="section-heading load-heading">
-      <h2 id="inbody-title">Состав тела · InBody</h2>
+  return `<details class="load-panel inbody-panel section" ${open ? 'open' : ''}>
+    <summary class="inbody-toggle"><h2>Состав тела · InBody</h2>${icon('next', 18)}</summary>
+    <div class="inbody-content">
       ${action('new-measurement', 'Новые показания', 'plus', 'primary')}
-    </div>
     ${latest ? `<p class="muted">Последний замер · ${shortDate(latest.date)}</p>
       <dl class="reading-summary">${Object.entries(INBODY_MAIN).map(([key, [label, unit]]) => `<div>
         <dt>${label}</dt><dd>${displayReading(latest.values[key], unit)}</dd>
@@ -465,7 +464,8 @@ function inbodySummary(entries, metricKey = DEFAULT_INBODY_METRIC) {
       <div id="inbody-chart">${inbodyChart(sorted, metricKey)}</div>` :
       '<p class="muted">Добавьте первый замер. После второго здесь появится динамика.</p>'}
     <a href="#inbody" class="button secondary inbody-history-link">${icon('journal', 20)} История замеров</a>
-  </section>`;
+    </div>
+  </details>`;
 }
 
 export function inbodyHistory(entries) {

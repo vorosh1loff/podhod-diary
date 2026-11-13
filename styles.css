@@ -466,12 +466,20 @@ button.exercise-grip:active { cursor: grabbing; }
   .calendar-week, .calendar-days { gap: 3px; }
 }
 
-.inbody-panel .section-heading { margin-bottom: 10px; }
+.inbody-toggle {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  min-height: 44px; cursor: pointer; list-style: none;
+}
+.inbody-toggle::-webkit-details-marker { display: none; }
+.inbody-toggle svg { flex: none; color: var(--accent); transform: rotate(90deg); }
+.inbody-panel[open] .inbody-toggle svg { transform: rotate(-90deg); }
+.inbody-content { margin-top: 10px; }
+.inbody-content > .button:first-child { margin-bottom: 10px; }
 .reading-summary {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 132px), 1fr)); gap: 10px;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;
   margin: 14px 0 18px;
 }
-.reading-summary > div { padding: 10px; border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.reading-summary > div { min-height: 84px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
 .reading-summary dt, .reading-summary .reading-delta { color: var(--muted); font-size: .8rem; }
 .reading-summary dd { margin: 2px 0 0; font-variant-numeric: tabular-nums; font-weight: 700; }
 .reading-summary .reading-delta { margin-top: 6px; font-weight: 400; }

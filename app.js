@@ -115,7 +115,7 @@ function render({ navigate = false } = {}) {
       break;
     }
     default:
-      main.innerHTML = journal(state, selectedLoadDate, loadWeekOffset);
+      main.innerHTML = journal(state, selectedLoadDate, loadWeekOffset, !navigate && Boolean(main.querySelector('.inbody-panel[open]')));
   }
   if (navigate) {
     window.scrollTo(0, 0);
