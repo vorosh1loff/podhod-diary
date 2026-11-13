@@ -1,6 +1,6 @@
 import { MUSCLES, number, plural, formatDate, formatStart, shortDate, workoutStats, currentWeek, today,
   INBODY_MAIN, INBODY_EXTRA, INBODY_SEGMENTS, INBODY_SEGMENT_FIELDS, INBODY_METRICS, DEFAULT_INBODY_METRIC } from './model.js';
-import { icon, muscleArt } from './graphics.js';
+import { icon } from './graphics.js';
 
 export const esc = value => String(value).replace(/[&<>"']/g, character => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -48,7 +48,7 @@ function calendarRows(workouts, date) {
   </li>`).join('')}</ul>`;
 }
 
-export function journal(state) {
+export function journal(state, selectedLoadDate) {
   let sets = 0;
   let volume = 0;
   for (const workout of state.workouts) {
@@ -77,7 +77,7 @@ export function journal(state) {
       </ul>
     </section>
     ${nextTrainingView(state, currentDate)}
-    ${loadView(week, state.loadUnit, week)}
+    ${weeklyLoadView(week, state.loadUnit, selectedLoadDate)}
     ${inbodySummary(state.measurements ?? [], state.inbodyMetric)}`;
 }
 
@@ -105,6 +105,7 @@ function nextTrainingView({ templates = [], nextTraining }, currentDate) {
   </section>`;
 }
 
+const compactLoad = new Intl.NumberFormat('ru-RU', { notation: 'compact', maximumFractionDigits: 1 });
 const weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const monthFormat = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
@@ -212,8 +213,12 @@ export function catalog(state, selection) {
     </section>`;
 }
 
-export function workoutView(workout, { date, history = false, template = false, unit } = {}) {
+export function workoutView(workout, { date, history = false, template = false, unit, openSets = new Set(), catalogById = new Map() } = {}) {
   const stats = workoutStats(workout);
+  const items = workout.items.map(item => {
+    const exercise = catalogById.get(item.exerciseId);
+    return exercise ? { ...item, name: exercise.name, note: exercise.note } : item;
+  });
   const canReorder = workout.items.length > 1;
   return `${workoutBackLink(date, history, template)}
     <div class="workout-head">
@@ -232,20 +237,21 @@ export function workoutView(workout, { date, history = false, template = false, 
       ${template ? '' : '<p class="muted session-edit-hint">Замены сохраняются только в этой записи тренировки.</p>'}
       ${canReorder ? '<p class="muted exercise-order-hint">Тяните за номер или нажмите, чтобы выбрать позицию.</p>' : ''}
       <div class="workout-items">
-        ${workout.items.map((item, index) => `<article class="exercise-entry" data-exercise-id="${item.id}" tabindex="-1" aria-labelledby="exercise-title-${item.id}">
+        ${items.map((item, index) => `<article class="exercise-entry" data-exercise-id="${item.id}" tabindex="-1" aria-labelledby="exercise-title-${item.id}">
           <div class="entry-head">
             ${canReorder ? `<button type="button" class="exercise-grip" data-action="move-item" data-id="${item.id}"
               aria-label="Переместить «${esc(item.name)}», позиция ${index + 1}">${icon('grip', 14)}<span class="exercise-number">${index + 1}</span></button>` :
               `<span class="exercise-grip"><span class="sr-only">Позиция </span><span class="exercise-number">${index + 1}</span></span>`}
             <div class="row-copy"><h3 id="exercise-title-${item.id}">${esc(item.name)}</h3>
               ${item.note ? `<p class="exercise-note">${esc(item.note)}</p>` : ''}
-              <span>${muscleNames(item.primary)}</span>
+              ${template ? `<span>${muscleNames(item.primary)}</span>` : ''}
             </div>
             <div class="row-actions">
               ${iconButton('edit-item', 'Настроить упражнение в тренировке', 'edit', `data-id="${item.id}"`)}
               ${iconButton('delete-item', 'Убрать из тренировки', 'trash', `data-id="${item.id}"`)}
             </div>
           </div>
+          ${template ? '' : `<details class="exercise-sets" data-item-id="${item.id}" ${openSets.has(item.id) ? 'open' : ''}><summary>${countSets(item.sets.length)} ${icon('next', 14)}</summary>`}
           ${item.sets.length ? `<table class="set-table"><thead><tr><th scope="col">Подход</th><th scope="col">Вес, кг</th><th scope="col">Повторы</th><th scope="col"><span class="sr-only">Действия</span></th></tr></thead><tbody>
             ${item.sets.map((set, index) => `<tr><th scope="row">${index + 1}</th><td>${number(set.kg)}</td><td>${number(set.reps)}</td>
               <td><div class="row-actions">${iconButton('edit-set', `Редактировать подход ${index + 1}`, 'edit', `data-id="${item.id}" data-set="${set.id}"`)}
@@ -255,6 +261,7 @@ export function workoutView(workout, { date, history = false, template = false, 
             ${action('new-set', 'Добавить подход', 'plus', 'text-button', `data-id="${item.id}"`)}
             ${template ? '' : action('replace-item', 'Заменить упражнение', 'swap', 'text-button', `data-id="${item.id}"`)}
           </div>
+          ${template ? '' : '</details>'}
         </article>`).join('')}
       </div>
       ${!workout.items.length ? '<p class="muted empty-workout">Выберите упражнение из каталога или создайте своё.</p>' : ''}
@@ -268,33 +275,67 @@ export function workoutBackLink(date, history = false, template = false) {
   return `<a class="button secondary workout-back" href="#${target}">${icon('back', 19)} ${label}</a>`;
 }
 
-function loadView(stats, unit, week) {
+function unitPicker(kg) {
+  return `<div class="unit-picker" role="group" aria-label="Единица нагрузки">
+    ${action('load-unit', 'Кг', null, 'text-button', `data-id="kg" aria-pressed="${kg}"`)}
+    ${action('load-unit', 'Баллы', null, 'text-button', `data-id="points" aria-pressed="${!kg}"`)}
+  </div>`;
+}
+
+function weeklyLoadView(week, unit, selectedDate) {
   const kg = unit === 'kg';
-  const values = kg ? stats.muscleKg : stats.load;
+  const field = kg ? 'muscleKg' : 'load';
+  const values = week.days.map(day => Object.values(day[field]).reduce((sum, value) => sum + value, 0));
+  const max = Math.max(...values) || 1;
+  const selected = week.days.find(day => day.date === selectedDate);
+  return `<section class="load-panel section" aria-labelledby="weekly-load-title">
+    <div class="section-heading load-heading"><h2 id="weekly-load-title">Нагрузка за неделю</h2>${unitPicker(kg)}</div>
+    <p class="week-dates">${shortDate(week.start)} — ${shortDate(week.end)}</p>
+    <div class="weekly-bars" role="group" aria-label="Нагрузка по дням недели">
+      ${week.days.map((day, index) => `<button type="button" class="weekly-bar" data-action="load-day" data-id="${day.date}"
+        aria-controls="daily-load" aria-pressed="${day === selected}"
+        aria-label="${formatDate(day.date)} — ${number(values[index])} ${kg ? 'кг' : 'балл.'}">
+        <span class="weekly-value">${values[index] >= 1000 ? compactLoad.format(values[index]) : number(values[index])}</span>
+        <span class="weekly-track" aria-hidden="true"><span style="--bar-height:${100 * values[index] / max}%"></span></span>
+        <time datetime="${day.date}">${Number(day.date.slice(-2))}</time><span>${weekdays[index]}</span>
+      </button>`).join('')}
+    </div>
+    <div id="daily-load" ${selected ? '' : 'hidden'}>${selected ? `<h3>Нагрузка за ${formatDate(selected.date)}</h3>
+      <p class="muted">Всего по группам — ${number(values[week.days.indexOf(selected)])} ${kg ? 'кг' : 'балл.'}</p>
+      ${loadTable(selected[field], kg)}` : ''}</div>
+    ${loadMethod(true)}
+  </section>`;
+}
+
+function loadView(stats, unit) {
+  const kg = unit === 'kg';
+  return `<section class="load-panel section" aria-labelledby="load-title">
+    <div class="section-heading load-heading"><h2 id="load-title">Нагрузка по мышцам</h2>${unitPicker(kg)}</div>
+    ${loadTable(kg ? stats.muscleKg : stats.load, kg)}
+    ${loadMethod()}
+  </section>`;
+}
+
+function loadTable(values, kg) {
   const ranked = Object.keys(MUSCLES).sort((a, b) => values[b] - values[a]);
   const max = values[ranked[0]] || 1;
-  return `<section class="load-panel section" aria-labelledby="load-title">
-    <div class="section-heading load-heading">
-      <h2 id="load-title">${week ? 'Нагрузка за неделю' : 'Нагрузка по мышцам'}</h2>
-      <div class="unit-picker" role="group" aria-label="Единица нагрузки">
-        ${action('load-unit', 'Кг', null, 'text-button', `data-id="kg" aria-pressed="${kg}"`)}
-        ${action('load-unit', 'Баллы', null, 'text-button', `data-id="points" aria-pressed="${!kg}"`)}
-      </div>
-    </div>
-    ${week ? `<p class="week-dates">Актуально на ${shortDate(week.start)} - ${shortDate(week.end)}</p>${muscleArt(values)}` : ''}
+  return `
     <table class="muscle-table">
       <thead><tr><th scope="col">Группа мышц</th><th scope="col">${kg ? 'Кг' : 'Баллы'}</th></tr></thead>
       <tbody>${ranked.map(key => `<tr><th scope="row">${MUSCLES[key]}
         <div class="load-track" aria-hidden="true"><span style="--fraction:${values[key] / max}"></span></div>
         </th><td>${number(values[key])}</td></tr>`).join('')}</tbody>
-    </table>
-    <details class="method load-method">
+    </table>`;
+}
+
+function loadMethod(weekly = false) {
+  return `<details class="method load-method">
       <summary class="button secondary">${icon('info', 18)} Как считаем ${icon('next', 14)}</summary>
       <p>Один подход даёт 1 балл каждой основной группе и 0,5 каждой вспомогательной.</p>
       <p>В кг считаем объём: вес × повторы. Для основной группы засчитывается весь объём подхода, для вспомогательной — половина. Поэтому значения по мышцам могут пересекаться.</p>
+      ${weekly ? '<p>Высота столбца показывает сумму нагрузки по всем группам за день.</p>' : ''}
       <p>При 0 кг подход даёт баллы. Длина полос показывает нагрузку относительно самой нагруженной группы.</p>
-    </details>
-  </section>`;
+    </details>`;
 }
 
 export function dataView(state, standalone) {

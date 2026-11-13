@@ -24,6 +24,7 @@ let submitDialog;
 let search = '';
 let selectedExercises = null;
 let displayedDay;
+let selectedLoadDate;
 const cancelExerciseReorder = enableExerciseReorder(main, dropExercise);
 
 function updateScrollTopButton() {
@@ -65,6 +66,7 @@ function removeEntry(items, id) {
 function render({ navigate = false } = {}) {
   if (!state) return;
   cancelExerciseReorder();
+  const openSets = new Set(navigate ? [] : [...main.querySelectorAll('.exercise-sets[open]')].map(panel => panel.dataset.itemId));
   const { page, id, fromDate, fromHistory } = getRoute();
   displayedDay = today();
   if (page !== 'exercises') selectedExercises = null;
@@ -102,12 +104,13 @@ function render({ navigate = false } = {}) {
       const workout = trainingList(state, template).find(entry => entry.id === id);
       const date = fromDate || (!fromHistory ? workout?.date : null);
       main.innerHTML = workout
-        ? workoutView(workout, { date, history: fromHistory, template, unit: state.loadUnit })
+        ? workoutView(workout, { date, history: fromHistory, template, unit: state.loadUnit, openSets,
+          catalogById: new Map(state.exercises.map(exercise => [exercise.id, exercise])) })
         : `<h1>Тренировка не найдена</h1>${workoutBackLink(date, fromHistory, template)}`;
       break;
     }
     default:
-      main.innerHTML = journal(state);
+      main.innerHTML = journal(state, selectedLoadDate);
   }
   if (navigate) {
     window.scrollTo(0, 0);
@@ -373,9 +376,11 @@ function chooseExercisePosition(workout, item, template, trigger) {
 }
 
 function editExercise(exercise, workout, item, template = false) {
-  const entry = item || exercise;
-  const hint = item ? 'Изменения применятся к этой тренировке.' :
-    exercise ? 'Название и группы мышц обновятся во всех шаблонах с этим упражнением. В шаблонах с отдельной заметкой сохранится её текст.' : '';
+  const linked = item && state.exercises.find(entry => entry.id === item.exerciseId);
+  const entry = linked ? { ...item, name: linked.name, note: linked.note } : item || exercise;
+  const hint = linked ? 'Название и заметка общие для каталога и тренировок. Группы мышц можно настроить для этой записи.' :
+    item ? 'Изменения применятся к этой тренировке.' :
+    exercise ? 'Название и заметка общие для каталога и тренировок. Группы мышц обновятся в шаблонах.' : '';
   openDialog({
     title: item ? 'Упражнение в тренировке' : exercise ? 'Редактировать упражнение' : 'Новое упражнение',
     wide: true,
@@ -394,22 +399,34 @@ function editExercise(exercise, workout, item, template = false) {
       const updated = { id: entry?.id || crypto.randomUUID(), name, primary, secondary, note };
       const addedItemId = workout && !item ? crypto.randomUUID() : undefined;
       await save(next => {
-        if (item) {
-          const target = findEntry(trainingList(next, template), workout.id, 'Тренировка');
-          Object.assign(findEntry(target.items, item.id, 'Упражнение'), updated);
-          return;
-        }
-        if (exercise) {
-          const catalogExercise = findEntry(next.exercises, exercise.id, 'Упражнение');
+        const catalogId = linked?.id ?? exercise?.id;
+        if (catalogId) {
+          const catalogExercise = findEntry(next.exercises, catalogId, 'Упражнение');
+          const identity = {};
+          if (name !== entry.name) identity.name = name;
+          if (note !== (entry.note ?? '')) identity.note = note;
           for (const program of next.templates ?? []) {
             for (const entry of program.items) {
-              if (entry.exerciseId !== catalogExercise.id) continue;
-              Object.assign(entry, { name, primary, secondary });
-              if ((entry.note ?? '') === (catalogExercise.note ?? '')) entry.note = note;
+              if (entry.exerciseId !== catalogId) continue;
+              Object.assign(entry, identity);
+              if (!item) Object.assign(entry, { primary, secondary });
             }
           }
-          Object.assign(catalogExercise, updated);
-        } else next.exercises.push(updated);
+          if (Object.keys(identity).length) {
+            for (const record of next.workouts) {
+              for (const entry of record.items) {
+                if (entry.exerciseId === catalogId) Object.assign(entry, identity);
+              }
+            }
+          }
+          Object.assign(catalogExercise, identity);
+          if (!item) Object.assign(catalogExercise, { primary, secondary });
+        }
+        if (item) {
+          const target = findEntry(trainingList(next, template), workout.id, 'Тренировка');
+          const targetItem = findEntry(target.items, item.id, 'Упражнение');
+          Object.assign(targetItem, linked ? { primary, secondary } : updated);
+        } else if (!exercise) next.exercises.push(updated);
         if (addedItemId) placeExercise(findEntry(trainingList(next, template), workout.id, 'Тренировка'), updated, addedItemId);
       });
       return { addedItemId, message: item ? 'Упражнение обновлено' : workout ? 'Упражнение добавлено' : 'Каталог обновлён' };
@@ -762,6 +779,11 @@ document.addEventListener('click', async event => {
         next => { next.exercises = next.exercises.filter(exercise => !ids.has(exercise.id)); });
       break;
     }
+    case 'load-day':
+      selectedLoadDate = id;
+      render();
+      restoreFocus(button);
+      break;
     case 'load-unit':
       if (!['kg', 'points'].includes(id) || (state.loadUnit ?? 'points') === id) break;
       pending = true;

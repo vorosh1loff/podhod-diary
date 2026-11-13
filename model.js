@@ -57,22 +57,20 @@ export function currentWeek(workouts, date = today()) {
   const days = Array.from({ length: 7 }, (_, index) => {
     const day = new Date(monday);
     day.setUTCDate(day.getUTCDate() + index);
-    return { date: day.toISOString().slice(0, 10), count: 0 };
+    return { date: day.toISOString().slice(0, 10), count: 0, load: emptyLoad(), muscleKg: emptyLoad() };
   });
   const byDate = new Map(days.map(day => [day.date, day]));
-  const load = emptyLoad();
-  const muscleKg = emptyLoad();
   for (const workout of workouts) {
     const day = byDate.get(workout.date);
     if (!day) continue;
     day.count += 1;
     const stats = workoutStats(workout);
     for (const key of Object.keys(MUSCLES)) {
-      load[key] += stats.load[key];
-      muscleKg[key] += stats.muscleKg[key];
+      day.load[key] += stats.load[key];
+      day.muscleKg[key] += stats.muscleKg[key];
     }
   }
-  return { start: days[0].date, end: days.at(-1).date, days, load, muscleKg };
+  return { start: days[0].date, end: days.at(-1).date, days };
 }
 export const plural = (value, one, few, many) => {
   const ending = value % 10;

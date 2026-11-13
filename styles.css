@@ -264,13 +264,31 @@ button.exercise-grip:active { cursor: grabbing; }
 .unit-picker { display: inline-flex; gap: 2px; background: var(--paper); padding: 2px; border-radius: 12px; }
 .unit-picker .button { min-height: 44px; padding-inline: 13px; color: var(--muted); }
 .unit-picker .button[aria-pressed="true"] { color: var(--accent-hover); background: var(--nav-selected); }
-.muscle-map { display: flex; justify-content: center; gap: 22px; padding: 16px 0; }
-.muscle-map div { width: min(34%, 120px); text-align: center; }
-.muscle-map svg { display: block; width: 100%; height: auto; }
-.muscle-map span { color: var(--muted); font-size: .83rem; }
-.muscle-outline { fill: var(--surface-hover); stroke: var(--line-strong); stroke-width: 1.1; }
-.muscle-zone { fill: var(--paper); stroke: var(--panel); stroke-width: .9; }
-.muscle-zone.loaded { fill: var(--accent); fill-opacity: var(--heat); }
+.weekly-bars {
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px;
+  margin-block: 14px 18px; padding-bottom: 8px; border-bottom: 1px solid var(--line-strong);
+}
+.weekly-bar {
+  display: grid; grid-template-rows: 2.5em 74px auto auto; align-items: end;
+  gap: 3px; padding: 3px 1px 5px; border: 1px solid transparent; border-radius: 8px;
+  min-width: 0; background: transparent; color: var(--muted); font-size: .75rem;
+  font-variant-numeric: tabular-nums; line-height: 1.2;
+}
+.weekly-bar time { color: var(--ink); font-weight: 700; }
+.weekly-value { color: var(--ink); overflow-wrap: anywhere; }
+.weekly-bar[aria-pressed="true"] { border-color: var(--accent); background: var(--nav-selected); }
+.weekly-track { display: flex; align-items: end; justify-content: center; height: 100%; }
+.weekly-track span {
+  width: min(60%, 32px); height: var(--bar-height); border-radius: 4px 4px 0 0; background: var(--accent);
+}
+#daily-load h3 { margin-bottom: 8px; }
+.exercise-sets summary {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 4px 7px;
+  color: var(--accent); cursor: pointer; list-style: none; font-size: .85rem; font-weight: 670;
+}
+.exercise-sets summary::-webkit-details-marker { display: none; }
+.exercise-sets summary svg { transform: rotate(90deg); }
+.exercise-sets[open] summary svg { transform: rotate(-90deg); }
 .muscle-table tbody th { font-weight: 550; }
 .muscle-table th:last-child, .muscle-table td { text-align: right; }
 .muscle-table td { color: var(--accent); overflow-wrap: anywhere; }
