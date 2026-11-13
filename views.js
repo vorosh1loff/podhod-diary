@@ -114,6 +114,8 @@ const monthFormat = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'num
 
 export function calendar(state, selectedDate) {
   const currentDate = today();
+  const plannedDate = state.nextTraining?.date;
+  const showPlan = plannedDate && !state.workouts.some(workout => workout.date === plannedDate);
   const monthKey = selectedDate.slice(0, 7);
   const [year, month] = monthKey.split('-').map(Number);
   const firstDay = new Date(Date.UTC(year, month - 1, 1));
@@ -147,14 +149,18 @@ export function calendar(state, selectedDate) {
             const day = index + 1;
             const date = `${monthKey}-${String(day).padStart(2, '0')}`;
             const total = byDate.get(date)?.length || 0;
-            const description = total ? countWorkouts(total) : 'без тренировок';
+            const planned = showPlan && date === plannedDate;
+            const description = total ? countWorkouts(total) : planned ? 'тренировка по плану' : 'без тренировок';
             return `<button class="calendar-day" type="button" data-action="calendar-day" data-id="${date}" data-date="${date}"
-              ${total ? 'data-trained' : ''} ${date === currentDate ? 'aria-current="date"' : ''}
+              ${total ? 'data-trained' : planned ? 'data-planned' : ''} ${date === currentDate ? 'aria-current="date"' : ''}
               aria-pressed="${date === selectedDate}" aria-label="${formatDate(date)}, ${description}">${day}</button>`;
           }).join('')}
         </div>
         <div class="calendar-footer">
-          <span class="calendar-legend">День с тренировкой</span>
+          <div class="calendar-legends">
+            <span class="calendar-legend">День с тренировкой</span>
+            ${showPlan ? `<a class="calendar-legend planned-legend" href="#calendar/${plannedDate}">По плану · ${shortDate(plannedDate)}</a>` : ''}
+          </div>
           ${currentDate.startsWith(monthKey) ? '' : iconButton('calendar-today', 'Перейти к текущей дате', 'calendar', `data-date="${currentDate}"`)}
         </div>
       </section>
