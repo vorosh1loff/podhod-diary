@@ -503,3 +503,5 @@ button.exercise-grip:active { cursor: grabbing; }
 .reading-segment legend { padding: 0 4px; color: var(--ink); font-weight: 700; }
 .segment-table small { display: block; color: var(--muted); font-size: .73rem; }
 .segment-table th, .segment-table td { padding-inline: 4px; }
+
+.clear-training-date, .height-edit { padding-inline: 7px; font-size: .82rem; }

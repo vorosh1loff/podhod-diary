@@ -1,5 +1,5 @@
 import { MUSCLES, number, plural, formatDate, formatStart, shortDate, workoutStats, currentWeek, today,
-  INBODY_MAIN, INBODY_EXTRA, INBODY_SEGMENTS, INBODY_SEGMENT_FIELDS, INBODY_METRICS, DEFAULT_INBODY_METRIC } from './model.js';
+  INBODY_MAIN, INBODY_EXTRA, INBODY_SEGMENTS, INBODY_SEGMENT_FIELDS, INBODY_METRICS, DEFAULT_INBODY_METRIC, bodyHeight } from './model.js';
 import { icon } from './graphics.js';
 
 export const esc = value => String(value).replace(/[&<>"']/g, character => ({
@@ -81,7 +81,7 @@ export function journal(state, selectedLoadDate, loadWeekOffset = 0, inbodyOpen 
     </section>
     ${nextTrainingView(state, currentDate)}
     ${weeklyLoadView(loadWeek, state.loadUnit, selectedLoadDate, loadWeekOffset === 0)}
-    ${inbodySummary(state.measurements ?? [], state.inbodyMetric, inbodyOpen)}`;
+    ${inbodySummary(state.measurements ?? [], state.inbodyMetric, inbodyOpen, bodyHeight(state))}`;
 }
 
 function nextTrainingView({ templates = [], nextTraining }, currentDate) {
@@ -92,7 +92,7 @@ function nextTrainingView({ templates = [], nextTraining }, currentDate) {
         <h2 id="next-training-title">Следующая тренировка</h2>
         <p id="next-training-past" class="muted" ${date && date < currentDate ? '' : 'hidden'}>Дата прошла</p>
       </div>
-      <span id="next-training-reset" ${templates.length && (templateId || date) ? '' : 'hidden'}>${iconButton('clear-next-training', 'Очистить план', 'close')}</span>
+      <span id="next-training-reset" ${templates.length && date ? '' : 'hidden'}>${action('clear-next-training', 'Очистить', null, 'text-button clear-training-date', 'aria-label="Очистить дату следующей тренировки"')}</span>
     </div>
     ${templates.length ? `<div class="next-training-controls">
       <select id="next-training-template" aria-label="Тренировка по плану">
@@ -381,7 +381,7 @@ const displayReading = (value, unit = '') => value === undefined ? '—' :
   `${number(value)}${unit === '%' ? '%' : unit ? ' ' + unit : ''}`;
 
 export function measurementFields(entry) {
-  const fields = (definitions, prefix = '') => Object.entries(definitions).map(([key, [label, unit]]) => {
+  const fields = (definitions, prefix = '') => Object.entries(definitions).filter(([key]) => key !== 'height').map(([key, [label, unit]]) => {
     const name = prefix + key;
     return `<label class="field">${label}${unit ? ', ' + unit : ''}
       <input name="${name}" inputmode="decimal" maxlength="10" autocomplete="off"
@@ -442,7 +442,8 @@ function readingDelta(current, base, unit) {
   return `${change > 0 ? '+' : ''}${displayReading(change, unit === '%' ? 'п. п.' : unit)}`;
 }
 
-function inbodySummary(entries, metricKey = DEFAULT_INBODY_METRIC, open = false) {
+function inbodySummary(entries, metricKey = DEFAULT_INBODY_METRIC, open = false, height = null) {
+  if (metricKey === 'height') metricKey = DEFAULT_INBODY_METRIC;
   const sorted = orderMeasurements(entries);
   const latest = sorted.at(-1);
   const previous = sorted.at(-2);
@@ -451,15 +452,18 @@ function inbodySummary(entries, metricKey = DEFAULT_INBODY_METRIC, open = false)
     <summary class="inbody-toggle"><h2>Состав тела · InBody</h2>${icon('next', 18)}</summary>
     <div class="inbody-content">
       ${action('new-measurement', 'Новые показания', 'plus', 'primary')}
-    ${latest ? `<p class="muted">Последний замер · ${shortDate(latest.date)}</p>
-      <dl class="reading-summary">${Object.entries(INBODY_MAIN).map(([key, [label, unit]]) => `<div>
-        <dt>${label}</dt><dd>${displayReading(latest.values[key], unit)}</dd>
+    ${latest ? `<p class="muted">Последний замер · ${shortDate(latest.date)}</p>` : ''}
+      <dl class="reading-summary">${Object.entries(INBODY_MAIN).map(([key, [label, unit]]) => key === 'height' ? `<div>
+        <dt>${label}</dt><dd>${displayReading(height ?? undefined, unit)}</dd>
+        <dd>${action('edit-body-height', height === null ? 'Указать' : 'Изменить', null, 'text-button height-edit', 'aria-label="Указать или изменить рост"')}</dd>
+      </div>` : `<div>
+        <dt>${label}</dt><dd>${displayReading(latest?.values[key], unit)}</dd>
         ${previous && latest.values[key] !== undefined ? `<dd class="reading-delta">
           К прошлому: <span>${readingDelta(latest.values[key], previous.values[key], unit)}</span><br>
           К первому: <span>${readingDelta(latest.values[key], first.values[key], unit)}</span></dd>` : ''}
       </div>`).join('')}</dl>
-      <label class="field chart-select">Показатель на графике<select id="inbody-metric">
-        ${Object.entries(INBODY_METRICS).map(([key, [label, unit]]) => `<option value="${key}" ${key === metricKey ? 'selected' : ''}>${label}${unit ? ', ' + unit : ''}</option>`).join('')}
+      ${latest ? `<label class="field chart-select">Показатель на графике<select id="inbody-metric">
+        ${Object.entries(INBODY_METRICS).filter(([key]) => key !== 'height').map(([key, [label, unit]]) => `<option value="${key}" ${key === metricKey ? 'selected' : ''}>${label}${unit ? ', ' + unit : ''}</option>`).join('')}
       </select></label>
       <div id="inbody-chart">${inbodyChart(sorted, metricKey)}</div>` :
       '<p class="muted">Добавьте первый замер. После второго здесь появится динамика.</p>'}

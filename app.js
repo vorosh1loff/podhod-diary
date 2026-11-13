@@ -1,6 +1,6 @@
 import { openStorage, readState, changeState } from './storage.js';
 import { today, isDate, validSet, parseBackup, backupOf, plural, formatDate, shortDate, NOTE_LIMIT, validNote,
-  DEFAULT_INBODY_METRIC, INBODY_FIELDS, INBODY_METRICS, parseMeasurement, parseMeasurements } from './model.js';
+  bodyHeight, parseBodyHeight, DEFAULT_INBODY_METRIC, INBODY_FIELDS, INBODY_METRICS, parseMeasurement, parseMeasurements } from './model.js';
 import { icon } from './graphics.js';
 import { enableExerciseReorder } from './exercise-reorder.js';
 import { esc, navigation, journal, calendar, historyView, catalog, workoutView, workoutBackLink, dataView, muscleFields, action,
@@ -509,6 +509,21 @@ function confirmRemove(title, copy, change, route) {
   });
 }
 
+function editBodyHeight() {
+  openDialog({
+    title: 'Рост',
+    content: `<label class="field">Рост, см<input name="height" inputmode="decimal" maxlength="10"
+      value="${bodyHeight(state) ?? ''}" placeholder="—"></label>`,
+    submit: async data => {
+      const raw = String(data.get('height') ?? '').trim().replace(',', '.');
+      if (raw && !/^\d+(\.\d{1,2})?$/.test(raw)) throw new Error('Введите рост в сантиметрах.');
+      const height = parseBodyHeight(raw ? Number(raw) : null);
+      await save(next => { next.bodyHeight = height; });
+      return { message: 'Рост сохранён' };
+    },
+  });
+}
+
 function editMeasurement(entry) {
   openDialog({
     title: entry ? 'Редактировать замер' : 'Новые показания InBody',
@@ -517,11 +532,13 @@ function editMeasurement(entry) {
     submit: async data => {
       const values = {};
       for (const [key, [label]] of Object.entries(INBODY_FIELDS)) {
+        if (key === 'height') continue;
         const raw = String(data.get(key) ?? '').trim().replace(',', '.');
         if (!raw) continue;
         if (!/^\d+(\.\d{1,2})?$/.test(raw)) throw new Error(`Проверьте число в поле «${label}».`);
         values[key] = Number(raw);
       }
+      if (entry?.values.height !== undefined) values.height = entry.values.height;
       const record = parseMeasurement({ id: entry?.id ?? crypto.randomUUID(), date: data.get('date'), values });
       await save(next => {
         const entries = next.measurements ??= [];
@@ -636,7 +653,7 @@ function filterRows(container, query) {
   container.querySelector('#catalog-empty').hidden = rows.some(row => !row.hidden);
 }
 
-async function updateNextTraining(field, value) {
+async function updateNextTraining(field, value, clearDate = false) {
   const controls = main.querySelector('.next-training-controls');
   try {
     if (field === 'date' && value && (!isDate(value) || value < today())) {
@@ -644,7 +661,7 @@ async function updateNextTraining(field, value) {
     }
     await save(next => {
       if (field === 'templateId' && value) findEntry(trainingList(next, true), value, 'Тренировка');
-      const plan = field ? { templateId: '', date: '', ...next.nextTraining, [field]: value } : null;
+      const plan = { templateId: '', date: '', ...next.nextTraining, [field]: value };
       next.nextTraining = plan?.templateId || plan?.date ? plan : null;
     });
   } catch (error) {
@@ -656,8 +673,8 @@ async function updateNextTraining(field, value) {
   controls.querySelector('#next-training-date').value = date;
   controls.querySelector('.next-training-date-label').textContent = date ? shortDate(date) : 'Дата';
   const reset = main.querySelector('#next-training-reset');
-  reset.hidden = !templateId && !date;
-  if (!field && reset.hidden) controls.querySelector('#next-training-template').focus({ preventScroll: true });
+  reset.hidden = !date;
+  if (clearDate && reset.hidden) controls.querySelector('#next-training-date').focus({ preventScroll: true });
   main.querySelector('#next-training-past').hidden = !date || date >= today();
 }
 
@@ -729,7 +746,8 @@ document.addEventListener('click', async event => {
   const set = item?.sets.find(entry => entry.id === setId);
   switch (command) {
     case 'close': dialog.close(); break;
-    case 'clear-next-training': void updateNextTraining(null); break;
+    case 'clear-next-training': void updateNextTraining('date', '', true); break;
+    case 'edit-body-height': editBodyHeight(); break;
     case 'new-measurement': editMeasurement(); break;
     case 'select-inbody': main.querySelector('#inbody-file').click(); break;
     case 'edit-measurement':

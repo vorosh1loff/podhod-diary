@@ -1,4 +1,4 @@
-import { initialState } from './model.js';
+import { bodyHeight, initialState } from './model.js';
 
 let database;
 const storeName = 'journal';
@@ -41,6 +41,7 @@ export function changeState(change) {
       try {
         next = request.result;
         if (!next) throw new Error('Не удалось прочитать дневник.');
+        if (next.bodyHeight === undefined) next.bodyHeight = bodyHeight(next);
         change(next);
         next.revision += 1;
         store.put(next, key);

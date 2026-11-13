@@ -139,6 +139,19 @@ export const INBODY_FIELDS = {
     Object.entries(INBODY_SEGMENT_FIELDS).map(([key, definition]) => [`${segment}_${key}`, definition]))),
 };
 
+export function bodyHeight(state) {
+  if (state.bodyHeight !== undefined) return state.bodyHeight;
+  return (state.measurements ?? []).reduce((latest, entry) =>
+    entry.values.height !== undefined && (!latest || entry.date > latest.date) ? entry : latest, null)?.values.height ?? null;
+}
+
+export function parseBodyHeight(value) {
+  const [, , max, min] = INBODY_MAIN.height;
+  check(value === null || (typeof value === 'number' && value >= min && value <= max &&
+    Math.abs(value * 100 - Math.round(value * 100)) < 1e-7), 'Введите рост от 1 до 300 см с точностью до двух знаков.');
+  return value;
+}
+
 export function parseMeasurement(entry) {
   check(isID(entry?.id) && isDate(entry.date), 'Проверьте дату замера.');
   check(entry.values && typeof entry.values === 'object' && !Array.isArray(entry.values), 'В замере нет показаний.');
@@ -172,7 +185,8 @@ export function backupOf(state) {
   return { format: 'podhod-training-diary', version: 4, exportedAt: new Date().toISOString(),
     exercises: state.exercises, workouts: state.workouts, templates: state.templates ?? [],
     loadUnit: state.loadUnit ?? 'points', measurements: state.measurements ?? [],
-    inbodyMetric: state.inbodyMetric ?? DEFAULT_INBODY_METRIC, nextTraining: state.nextTraining ?? null };
+    inbodyMetric: state.inbodyMetric === 'height' ? DEFAULT_INBODY_METRIC : state.inbodyMetric ?? DEFAULT_INBODY_METRIC,
+    bodyHeight: bodyHeight(state), nextTraining: state.nextTraining ?? null };
 }
 
 export function parseBackup(value) {
@@ -226,6 +240,7 @@ export function parseBackup(value) {
     return result;
   }
   const workouts = value.workouts.map(entry => workout(entry, false));
+  const measurements = value.version >= 3 ? parseMeasurements(value.measurements) : undefined;
   const templates = value.version >= 2 ? value.templates.map(entry => workout(entry, true)) : [];
   check(hasUniqueIDs(exercises) && hasUniqueIDs(workouts) && hasUniqueIDs(templates), 'В файле повторяются идентификаторы записей.');
   let nextTraining = null;
@@ -236,6 +251,7 @@ export function parseBackup(value) {
     if (templateId || date) nextTraining = { templateId, date };
   }
   return { exercises, workouts, templates, nextTraining, ...(value.version >= 2 ? { loadUnit: value.loadUnit } : {}),
-    ...(value.version >= 3 ? { measurements: parseMeasurements(value.measurements) } : {}),
+    ...(value.version >= 3 ? { measurements,
+      bodyHeight: value.bodyHeight === undefined ? bodyHeight({ measurements }) : parseBodyHeight(value.bodyHeight) } : {}),
     ...(value.version === 4 ? { inbodyMetric: value.inbodyMetric } : {}) };
 }
