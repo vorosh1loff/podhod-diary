@@ -49,27 +49,14 @@ function calendarRows(workouts, date) {
 }
 
 export function journal(state, selectedLoadDate, loadWeekOffset = 0, inbodyOpen = false) {
-  let sets = 0;
-  let volume = 0;
-  for (const workout of state.workouts) {
-    const totals = workoutStats(workout);
-    sets += totals.sets;
-    volume += totals.volume;
-  }
   const currentDate = today();
   const week = currentWeek(state.workouts, currentDate);
   const loadDate = new Date(currentDate);
   loadDate.setUTCDate(loadDate.getUTCDate() + loadWeekOffset * 7);
   const loadWeek = loadWeekOffset ? currentWeek(state.workouts, loadDate.toISOString().slice(0, 10)) : week;
-  const count = week.days.reduce((sum, day) => sum + day.count, 0);
   return `
     <h1 class="sr-only">Дневник</h1>
-    <section class="week-overview" aria-label="Итоги и календарь недели">
-      <dl class="totals">
-        ${metric('Тренировки на этой неделе', count)}
-        ${metric('Подходы всего', sets)}
-        ${metric('Кг всего', volume)}
-      </dl>
+    <section class="week-overview" aria-label="Календарь недели">
       <ul class="week-strip" aria-label="Текущая неделя, с понедельника по воскресенье">
         ${week.days.map(({ date, count }, index) => `<li><a class="week-day" href="#calendar/${date}"
           ${count ? 'data-trained' : ''} ${date === currentDate ? 'aria-current="date"' : ''}
@@ -176,9 +163,6 @@ export function calendar(state, selectedDate) {
     <div class="calendar-history"><a class="button secondary" href="#history/${selectedDate}">${icon('journal', 20)} История</a></div>`;
 }
 
-function metric(label, value) {
-  return `<div class="metric"><dt>${label}</dt><dd>${number(value)}</dd></div>`;
-}
 
 export function catalog(state, selection) {
   const sorted = [...state.exercises].sort((a, b) => a.name.localeCompare(b.name, 'ru'));

@@ -91,12 +91,6 @@ svg { flex: none; vertical-align: middle; }
 .text-button { background: transparent; color: var(--accent); }
 
 .week-overview { padding: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
-.totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0 0 15px; padding: 0 0 14px; border-bottom: 1px solid var(--line); }
-.metric { display: flex; flex-direction: column; justify-content: flex-start; gap: 4px; min-width: 0; padding: 0 16px; }
-.metric + .metric { border-left: 1px solid var(--line); }
-.metric dt { color: var(--muted); font-size: .85rem; font-weight: 650; overflow-wrap: anywhere; }
-.metric dd { order: -1; margin: 0; font-size: 2.2rem; font-weight: 760; letter-spacing: -.03em; line-height: 1.05; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.metric:first-child dd { color: var(--accent); }
 .week-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; padding: 0; margin: 0; list-style: none; }
 .week-day { display: grid; justify-items: center; align-content: center; gap: 2px; min-height: 66px; padding: 4px 0; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); text-decoration: none; }
 .week-day > span:first-child { color: var(--muted); font-size: .73rem; font-weight: 650; }
@@ -430,10 +424,6 @@ button.exercise-grip:active { cursor: grabbing; }
 }
 @media (max-width: 540px) {
   .week-overview { padding: 11px 8px 9px; }
-  .totals { margin-bottom: 10px; padding-bottom: 10px; }
-  .metric { padding-inline: 6px; }
-  .metric dt { font-size: .72rem; line-height: 1.15; }
-  .metric dd { font-size: 1.58rem; }
   .week-strip { gap: 4px; }
   .week-day { min-height: 59px; border-radius: 8px; }
   .week-day time { font-size: 1rem; }
