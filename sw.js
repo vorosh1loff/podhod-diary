@@ -1,5 +1,5 @@
-const revision = "211efc85a71c3fd3";
-const files = ["./app.js","./exercise-reorder.js","./graphics.js","./icons/apple-touch-icon.png","./icons/icon-192.png","./icons/icon-512.png","./icons/maskable-512.png","./icons/source.svg","./","./manifest.webmanifest","./model.js","./report.js","./storage.js","./styles.css","./views.js"];
+const revision = "a5a6dc6c06f4624c";
+const files = ["./app.js","./exercise-reorder.js","./graphics.js","./icons/apple-touch-icon.png","./icons/icon-192.png","./icons/icon-512.png","./icons/maskable-512.png","./icons/source.svg","./","./manifest.webmanifest","./model.js","./report.js","./storage.js","./styles.css","./views.js","./vendor/jspdf-4.2.1.min.js","./vendor/LiberationSans-Regular.ttf"];
 const scope = new URL(self.registration.scope);
 const prefix = `podhod:${scope.pathname}:`;
 const cacheName = prefix + revision;

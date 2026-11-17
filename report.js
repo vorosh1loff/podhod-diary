@@ -1,55 +1,130 @@
 import { formatDate, formatStart, number, plural } from './model.js';
-import { esc } from './views.js';
 
 const reportMonth = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const margin = 15;
+const bottom = 280;
+const rowHeight = 7;
+const fontSize = 11;
 
-export function workoutReport(workouts, exercises, period, month) {
+async function createPdf() {
+  const [, response] = await Promise.all([
+    import('./vendor/jspdf-4.2.1.min.js'),
+    fetch(new URL('./vendor/LiberationSans-Regular.ttf', import.meta.url)),
+  ]);
+  if (!response.ok) throw new Error('Шрифт для отчёта недоступен.');
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const chunks = [];
+  for (let offset = 0; offset < bytes.length; offset += 8192) {
+    chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + 8192)));
+  }
+  const pdf = new globalThis.jspdf.jsPDF({ format: 'a4', compress: true, putOnlyUsedFonts: true });
+  pdf.addFileToVFS('LiberationSans.ttf', btoa(chunks.join('')));
+  pdf.addFont('LiberationSans.ttf', 'LiberationSans', 'normal');
+  pdf.setFont('LiberationSans');
+  return pdf;
+}
+
+export async function workoutReport(workouts, exercises, period, month) {
+  const pdf = await createPdf();
   const names = new Map(exercises.map(exercise => [exercise.id, exercise.name]));
-  const byDate = new Map();
   const sorted = [...workouts].sort((a, b) => a.date.localeCompare(b.date) ||
     (a.startedAt ?? '').localeCompare(b.startedAt ?? ''));
-  for (const workout of sorted) {
-    if (!byDate.has(workout.date)) byDate.set(workout.date, []);
-    byDate.get(workout.date).push(workout);
-  }
   const label = month ? reportMonth.format(new Date(period + '-01')) : formatDate(sorted[0].date);
   const total = plural(sorted.length, 'тренировка', 'тренировки', 'тренировок');
-  return `<!doctype html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Отчёт о тренировках · ${label}</title>
-<style>
-  :root { color-scheme: light; font: 16px/1.45 system-ui, sans-serif; color: #182030; background: #fff; }
-  body { max-width: 760px; margin: auto; padding: 24px 16px; overflow-wrap: anywhere; }
-  h1, h2, h3, h4, p { margin: 0 0 8px; }
-  header { padding-bottom: 16px; border-bottom: 2px solid #182030; }
-  header p, .subtle { color: #4c5666; }
-  section { margin-block: 26px; }
-  article { margin-top: 16px; }
-  .exercise { margin-top: 14px; break-inside: avoid; }
-  h2, h3, h4 { break-after: avoid; }
-  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-  th, td { padding: 6px 8px; border-bottom: 1px solid #d7dde5; text-align: right; }
-  th:first-child { text-align: left; }
-  thead { background: #f0f3f7; }
-  @media print { body { padding: 0; } }
-</style>
-</head>
-<body>
-<header><h1>Отчёт о тренировках</h1><p>${label} · ${total}</p></header>
-${[...byDate].map(([date, records]) => `<section><h2>${formatDate(date)}</h2>
-  ${records.map(workout => `<article><h3>${esc(workout.name)}</h3>
-    ${workout.startedAt ? `<p class="subtle">Начало · ${formatStart(workout)}</p>` : ''}
-    ${workout.items.map(item => `<div class="exercise">
-      <h4>${esc(names.get(item.exerciseId) ?? item.name)}</h4>
-      <p class="subtle">${plural(item.sets.length, 'подход', 'подхода', 'подходов')}</p>
-      ${item.sets.length ? `<table><thead><tr><th scope="col">Подход</th><th scope="col">Вес, кг</th><th scope="col">Повторы</th></tr></thead>
-      <tbody>${item.sets.map((set, index) => `<tr><th scope="row">${index + 1}</th><td>${number(set.kg)}</td><td>${number(set.reps)}</td></tr>`).join('')}</tbody></table>` : ''}
-    </div>`).join('') || '<p class="subtle">Нет записанных упражнений.</p>'}
-  </article>`).join('')}
-</section>`).join('')}
-</body>
-</html>`;
+  const width = pdf.internal.pageSize.getWidth() - 2 * margin;
+  let y = margin;
+
+  function wrap(value, size) {
+    pdf.setFontSize(size);
+    return pdf.splitTextToSize(value, width);
+  }
+
+  function text(value, size, spacing, color = '#182030') {
+    pdf.setFontSize(size);
+    pdf.setTextColor(color);
+    for (const line of Array.isArray(value) ? value : [value]) {
+      pdf.text(line, margin, y, { baseline: 'top' });
+      y += spacing;
+    }
+  }
+
+  function header(continuation = false) {
+    text('Отчёт о тренировках', continuation ? 14 : 22, continuation ? 7 : 11);
+    text(continuation ? label : `${label} · ${total}`, 11, 8, '#4c5666');
+    pdf.setDrawColor('#aab5c4');
+    pdf.line(margin, y, margin + width, y);
+    y += 7;
+  }
+
+  function nextPage() {
+    pdf.addPage();
+    y = margin;
+    header(true);
+  }
+
+  function tableRow(cells, heading = false) {
+    if (heading) {
+      pdf.setFillColor('#edf1f6');
+      pdf.rect(margin, y, width, rowHeight, 'F');
+    }
+    pdf.setFontSize(fontSize);
+    pdf.setTextColor('#182030');
+    pdf.text(cells[0], margin + 3, y + 1.7, { baseline: 'top' });
+    pdf.text(cells[1], margin + width * 0.63, y + 1.7, { align: 'right', baseline: 'top' });
+    pdf.text(cells[2], margin + width - 3, y + 1.7, { align: 'right', baseline: 'top' });
+    y += rowHeight;
+    pdf.setDrawColor('#d7dde5');
+    pdf.line(margin, y, margin + width, y);
+  }
+
+  const columns = ['Подход', 'Вес, кг', 'Повторы'];
+  const setCount = count => plural(count, 'подход', 'подхода', 'подходов');
+  header();
+
+  for (const workout of sorted) {
+    const date = formatDate(workout.date);
+    const context = workout.startedAt ? `${date} · ${formatStart(workout)}` : date;
+    const title = wrap(workout.name, 16);
+    if (y + 13 + title.length * 7 + 35 > bottom) nextPage();
+    y += 3;
+    text(context, 11, 6, '#4c5666');
+    text(title, 16, 7);
+    if (!workout.items.length) text('Нет записанных упражнений.', 11, 6, '#4c5666');
+
+    for (const item of workout.items) {
+      const name = names.get(item.exerciseId) ?? item.name;
+      const heading = wrap(name, 13);
+      const setRows = item.sets.length ? 2 * rowHeight : 0;
+      if (y + 4 + heading.length * 6 + 6 + setRows > bottom) {
+        nextPage();
+        text(wrap(`${context} · ${workout.name}`, 10), 10, 5, '#4c5666');
+      }
+      y += 4;
+      text(heading, 13, 6);
+      text(setCount(item.sets.length), 10, 6, '#4c5666');
+      if (!item.sets.length) continue;
+      tableRow(columns, true);
+
+      for (const [index, set] of item.sets.entries()) {
+        if (y + rowHeight > bottom) {
+          nextPage();
+          text(wrap(`${context} · ${workout.name}`, 10), 10, 5, '#4c5666');
+          text(wrap(`${name} (продолжение)`, 13), 13, 6);
+          tableRow(columns, true);
+        }
+        tableRow([number(index + 1), number(set.kg), number(set.reps)]);
+      }
+    }
+    y += 7;
+  }
+
+  const pages = pdf.getNumberOfPages();
+  for (let page = 1; page <= pages; page++) {
+    pdf.setPage(page);
+    pdf.setFontSize(9);
+    pdf.setTextColor('#4c5666');
+    pdf.text(`${page} / ${pages}`, margin + width, 288, { align: 'right' });
+  }
+  pdf.setProperties({ title: `Отчёт о тренировках · ${label}` });
+  return pdf.output('arraybuffer');
 }

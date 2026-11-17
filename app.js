@@ -882,7 +882,15 @@ document.addEventListener('click', async event => {
         : state.workouts.filter(record => month ? record.date.slice(0, 7) === period : record.date === date);
       if (!workouts.length) break;
       const filename = command === 'report-workout' ? `podhod-${workout.date}-${workout.id}` : `podhod-${period}`;
-      downloadFile(workoutReport(workouts, state.exercises, period, month), 'text/html;charset=utf-8', `${filename}.html`);
+      button.disabled = true;
+      try {
+        const pdf = await workoutReport(workouts, state.exercises, period, month);
+        downloadFile(pdf, 'application/pdf', `${filename}.pdf`);
+      } catch {
+        showNotice('Не удалось создать PDF. Откройте дневник с интернетом и попробуйте ещё раз.');
+      } finally {
+        button.disabled = false;
+      }
       break;
     }
     case 'export':
