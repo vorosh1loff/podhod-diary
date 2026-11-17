@@ -2,6 +2,7 @@ import { openStorage, readState, changeState } from './storage.js';
 import { today, isDate, validSet, parseBackup, backupOf, plural, formatDate, shortDate, NOTE_LIMIT, validNote,
   bodyHeight, parseBodyHeight, DEFAULT_INBODY_METRIC, INBODY_FIELDS, INBODY_METRICS, parseMeasurement, parseMeasurements } from './model.js';
 import { icon } from './graphics.js';
+import { workoutReport } from './report.js';
 import { enableExerciseReorder } from './exercise-reorder.js';
 import { esc, navigation, journal, calendar, historyView, catalog, workoutView, workoutBackLink, dataView, muscleFields, action,
   measurementFields, inbodyChart, inbodyHistory, inbodyDetails } from './views.js';
@@ -11,7 +12,6 @@ const nav = document.querySelector('#nav');
 const dialog = document.querySelector('#dialog');
 const scrollTopButton = document.querySelector('#scroll-top');
 const notice = document.querySelector('#notice');
-const status = document.querySelector('#offline-status');
 document.documentElement.classList.add('js');
 const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -600,11 +600,15 @@ async function importMeasurements(file, trigger) {
 
 async function exportBackup() {
   const current = await readState();
-  const blob = new Blob([JSON.stringify(backupOf(current), null, 2)], { type: 'application/json' });
+  downloadFile(JSON.stringify(backupOf(current), null, 2), 'application/json', `podhod-${today()}.json`);
+}
+
+function downloadFile(content, type, filename) {
+  const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `podhod-${today()}.json`;
+  link.download = filename;
   document.body.append(link);
   link.click();
   link.remove();
@@ -867,6 +871,20 @@ document.addEventListener('click', async event => {
       if (set) confirmRemove('Удалить подход?', 'Нагрузка и объём тренировки пересчитаются автоматически.',
         next => removeEntry(findEntry(findEntry(trainingList(next, template), workout.id, 'Тренировка').items, id, 'Упражнение').sets, setId));
       break;
+    case 'report-day':
+    case 'report-month':
+    case 'report-workout': {
+      const date = isDate(route.id) ? route.id : today();
+      const month = command === 'report-month';
+      const period = month ? date.slice(0, 7) : date;
+      const workouts = command === 'report-workout'
+        ? (route.page === 'workout' && workout ? [workout] : [])
+        : state.workouts.filter(record => month ? record.date.slice(0, 7) === period : record.date === date);
+      if (!workouts.length) break;
+      const filename = command === 'report-workout' ? `podhod-${workout.date}-${workout.id}` : `podhod-${period}`;
+      downloadFile(workoutReport(workouts, state.exercises, period, month), 'text/html;charset=utf-8', `${filename}.html`);
+      break;
+    }
     case 'export':
       try { await exportBackup(); } catch { showNotice('Не удалось сохранить копию. Попробуйте ещё раз.'); }
       break;
@@ -883,28 +901,12 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) void
 channel?.addEventListener('message', refresh);
 
 async function enableOffline() {
-  if (!('serviceWorker' in navigator) || !window.isSecureContext) {
-    status.textContent = 'Для офлайна нужен HTTPS';
-    return;
-  }
-  const updateBadge = () => {
-    const ready = Boolean(navigator.serviceWorker.controller);
-    status.dataset.ready = String(ready);
-    status.textContent = ready ? 'offline' : 'Подготовка офлайна…';
-  };
-  navigator.serviceWorker.addEventListener('controllerchange', updateBadge);
-  updateBadge();
+  if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
   try {
-    const registration = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
-    const watchWorker = worker => worker?.addEventListener('statechange', () => {
-      if (worker.state === 'redundant' && !navigator.serviceWorker.controller) status.textContent = 'Офлайн не готов. Обновите страницу';
-    });
-    watchWorker(registration.installing);
-    registration.addEventListener('updatefound', () => watchWorker(registration.installing));
-    updateBadge();
+    await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
     if (standalone) void navigator.storage?.persist?.().catch(() => {});
-  } catch {
-    status.textContent = 'Офлайн не готов. Обновите страницу';
+  } catch (error) {
+    console.warn('Не удалось включить офлайн-режим.', error);
   }
 }
 
@@ -914,6 +916,5 @@ try {
   render();
   void enableOffline();
 } catch {
-  status.textContent = 'Хранилище недоступно';
   main.innerHTML = '<h1>Дневник не открылся</h1><p>Браузер не смог открыть локальные данные. Разрешите хранение данных сайта и обновите страницу.</p><a class="back-link" href="./">Открыть снова</a>';
 }

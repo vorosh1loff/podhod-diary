@@ -150,6 +150,7 @@ export function calendar(state, selectedDate) {
           </div>
           ${currentDate.startsWith(monthKey) ? '' : iconButton('calendar-today', 'Перейти к текущей дате', 'calendar', `data-date="${currentDate}"`)}
         </div>
+        ${byDate.size ? `<div class="report-action">${action('report-month', 'Экспорт за месяц', 'download')}</div>` : ''}
       </section>
       <section class="calendar-agenda" aria-labelledby="calendar-agenda-title">
         <div class="section-heading">
@@ -157,7 +158,8 @@ export function calendar(state, selectedDate) {
           ${selected.length ? `<span class="muted">${countWorkouts(selected.length)}</span>` : ''}
         </div>
         ${action('start-workout', 'Тренируюсь', 'plus', 'primary', `data-date="${selectedDate}"`)}
-        ${selected.length ? calendarRows(selected, selectedDate) : '<p class="muted">В этот день тренировок нет.</p>'}
+        ${selected.length ? `${calendarRows(selected, selectedDate)}
+          <div class="report-action">${action('report-day', 'Экспорт за день', 'download')}</div>` : '<p class="muted">В этот день тренировок нет.</p>'}
       </section>
     </div>
     <div class="calendar-history"><a class="button secondary" href="#history/${selectedDate}">${icon('journal', 20)} История</a></div>`;
@@ -259,7 +261,8 @@ export function workoutView(workout, { date, history = false, template = false, 
       </div>
       ${!workout.items.length ? '<p class="muted empty-workout">Выберите упражнение из каталога или создайте своё.</p>' : ''}
     </section>
-    ${loadView(stats, unit)}`;
+    ${loadView(stats, unit)}
+    ${template ? '' : `<div class="report-action">${action('report-workout', 'Экспорт тренировки', 'download')}</div>`}`;
 }
 
 export function workoutBackLink(date, history = false, template = false) {
